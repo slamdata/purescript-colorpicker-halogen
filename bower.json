@@ -1,0 +1,28 @@
+{
+  "name": "purescript-colorpicker-halogen",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/slamdata/purescript-colorpicker-halogen.git"
+  },
+  "authors": [
+    "Irakli Safareli <i.safareli@gmail.com>"
+  ],
+  "ignore": [
+    "**/.*",
+    "bower_components",
+    "node_modules",
+    "output",
+    "tests",
+    "tmp",
+    "bower.json",
+    "package.json",
+    "example"
+  ],
+  "dependencies": {
+    "purescript-colors": "^3.0.0",
+    "purescript-halogen": "^2.1.0",
+    "purescript-halogen-css": "^6.0.0",
+    "purescript-dom-classy": "^2.1.0"
+  }
+}
