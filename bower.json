@@ -23,6 +23,10 @@
     "purescript-colors": "^3.0.0",
     "purescript-halogen": "^2.1.0",
     "purescript-halogen-css": "^6.0.0",
-    "purescript-dom-classy": "^2.1.0"
+    "purescript-dom-classy": "^2.1.0",
+    "purescript-dom": "git://github.com/safareli/purescript-dom.git#mousepagexy"
+  },
+  "resolutions": {
+    "purescript-dom": "mousepagexy"
   }
 }

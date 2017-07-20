@@ -4,7 +4,7 @@ import Prelude
 
 import ColorPicker.Halogen.Component as CPicker
 import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.Class (class MonadEff)
+import Control.Monad.Aff.Class (class MonadAff)
 import Data.Either.Nested as Either
 import Data.Functor.Coproduct.Nested as Coproduct
 import Data.Maybe (Maybe(..))
@@ -36,7 +36,7 @@ type HTML m = H.ParentHTML Query ChildQuery Slot m
 type DSL m = H.ParentDSL State Query ChildQuery Slot Void m
 
 
-example ∷ ∀ m r. MonadEff (CPicker.PickerEffects r) m => H.Component HH.HTML Query Unit Void m
+example ∷ ∀ m r. MonadAff (CPicker.PickerEffects r) m => H.Component HH.HTML Query Unit Void m
 example = H.parentComponent
     { initialState: const {}
     , render
@@ -44,11 +44,10 @@ example = H.parentComponent
     , receiver: const Nothing
     }
 
-render ∷ ∀ m r. MonadEff (CPicker.PickerEffects r) m => State → HTML m
+render ∷ ∀ m r. MonadAff (CPicker.PickerEffects r) m => State → HTML m
 render _ = HH.div_
-  [ HH.h1_ [ HH.text "Picker 1" ]
-  , HH.slot' cpColor 0 CPicker.picker unit (HE.input (HandleMsg 0))
-  ]
+  -- [ HH.h1_ [ HH.text "Picker 1" ]] <>
+  [ HH.slot' cpColor 0 CPicker.picker unit (HE.input (HandleMsg 0))]
 
 eval ∷ ∀ m. Query ~> DSL m
 eval (HandleMsg _ _ next) = pure next
