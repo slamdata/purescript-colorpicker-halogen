@@ -7,6 +7,7 @@ module ColorPicker.Halogen.Utils.Drag
   , Position
   , cursorEventToPosition
   , cursorEventToTarget
+  , mkFirstDragData
   , mkDragData
   ) where
 
@@ -20,7 +21,7 @@ import Control.Monad.Eff.Ref (REF, newRef, readRef, writeRef)
 import Control.Monad.Except (runExcept)
 import DOM (DOM)
 import DOM.Classy.Event (target)
-import DOM.Classy.HTMLElement (getBoundingClientRect)
+import DOM.Classy.HTMLElement (getBoundingClientRect, DOMRect)
 import DOM.Classy.Node (fromNode)
 import DOM.Event.EventTarget (EventListener, eventListener, addEventListener, removeEventListener)
 import DOM.Event.MouseEvent as MouseE
@@ -35,7 +36,6 @@ import Data.Either (Either(..), either, hush)
 import Data.Foldable (traverse_)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..), fromMaybe)
-import Debug.Trace (spy)
 import Halogen.Query.EventSource as ES
 
 
@@ -130,15 +130,6 @@ cursorEventToPosition (Right e) =
       , y: toNumber $ TouchE.pageY t
       }
 
-type DomRect =
-  { left ∷ Number
-  , right ∷ Number
-  , top ∷ Number
-  , bottom ∷ Number
-  , width ∷ Number
-  , height ∷ Number
-  }
-
 scrollPosition :: ∀ r. Eff (dom ∷ DOM | r) Position
 scrollPosition = do
   w ← window
@@ -147,9 +138,9 @@ scrollPosition = do
   pure {x, y}
 
 absoluteDomRect
-  ∷ DomRect
+  ∷ DOMRect
   → Position
-  → DomRect
+  → DOMRect
 absoluteDomRect rect scrollPos = rect
   { left = rect.left + scrollPos.x
   , right = rect.right + scrollPos.x
@@ -160,32 +151,30 @@ absoluteDomRect rect scrollPos = rect
 nodeBoundingClientRect
   ∷ ∀ r
   . Node
-  → Eff (dom ∷ DOM | r) DomRect
-nodeBoundingClientRect node = map fixRect $ fromMaybe
+  → Eff (dom ∷ DOM | r) DOMRect
+nodeBoundingClientRect node = fromMaybe
   (pure {left: 0.0, right: 0.0, top: 0.0, bottom: 0.0, width: 0.0, height: 0.0})
   (getBoundingClientRect <$>elem)
   where
   elem ∷ Maybe HTMLElement
   elem = fromNode $ node
-  fixRect {left, right, top, bottom, width, height} =
-    {left, right, top, bottom, width, height}
 
-clapInRect ∷ Position → DomRect → Position
+clapInRect ∷ Position → DOMRect → Position
 clapInRect { x, y } { left, right, top, bottom } =
   { x: clamp left right x
   , y: clamp top bottom y
   }
 
-positionInRect ∷ Position → DomRect → Position
+positionInRect ∷ Position → DOMRect → Position
 positionInRect { x, y } { left, right, top, bottom } =
   { x: x - left
   , y: y - top
   }
 
-progressInRect ∷ Position → DomRect → Position
+progressInRect ∷ Position → DOMRect → Position
 progressInRect { x, y } { left, width, top, height } =
-  { x: x / width * 100.0
-  , y: y / height * 100.0
+  { x: x / width
+  , y: y / height
   }
 
 mkDragData
@@ -209,3 +198,9 @@ mkDragData pos event node = do
 
 positionZero ∷ Position
 positionZero = { x: 0.0, y: 0.0 }
+
+mkFirstDragData :: ∀ r. CursorEvent → Eff ( dom ∷ DOM | r ) DragData
+mkFirstDragData event = do
+  let position = cursorEventToPosition event
+  let node = cursorEventToTarget event
+  mkDragData { prev: position , init: position } event node

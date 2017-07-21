@@ -8,7 +8,9 @@ import ColorPicker.Halogen.Utils.Drag as Drag
 import Control.Monad.Aff.Class (class MonadAff)
 import DOM.Classy.Event (preventDefault)
 import Data.Either (Either(..), either)
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Int (toNumber)
+import Data.Maybe (Maybe(..))
+import Debug.Trace (spy)
 import Halogen (liftEff)
 import Halogen as H
 import Halogen.HTML as HH
@@ -16,111 +18,133 @@ import Halogen.HTML.CSS as HCSS
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 
-data Condition = Idle | ColorDrag | HueDrag
-
 type State =
-  { color ∷ Maybe Color.Color
-  , condition ∷ Condition
-  , drag ∷ Maybe Drag.DragData
+  { color ∷ Color.Color -- switch to Maybe Color
+  , props ∷ Props
   }
 
 type Message = Unit
+type Props =
+  { mainRectWidth ∷ Int
+  , hueRectWidth ∷ Int
+  }
 data Query a
-  = NoOp a
-  | DragStart Drag.CursorEvent a
-  | DragMove Drag.DragEvent a
+  = SetProps Props a
+  | FieldDragStart Drag.CursorEvent a
+  | FieldDragMove Drag.DragEvent a
+  | SliderDragStart Drag.CursorEvent a
+  | SliderDragMove Drag.DragEvent a
 
 type HTML = H.ComponentHTML Query
 type DSL m = H.ComponentDSL State Query Message m
 
 type PickerEffects r = Drag.DragEffects r
 
+initialColor ∷ Color.Color
+initialColor = Color.hsl 182.4 0.49 0.64
 
-picker ∷ ∀ m r. MonadAff (PickerEffects r) m ⇒ H.Component HH.HTML Query Unit Message m
+picker ∷ ∀ m r. MonadAff (PickerEffects r) m ⇒ H.Component HH.HTML Query Props Message m
 picker = H.component
-  { initialState: const
-      { color: Nothing
-      , condition: Idle
-      , drag: Nothing}
+  { initialState: \props ->
+      { color: initialColor
+      , props
+      }
   , render
   , eval
-  , receiver: const Nothing
+  , receiver: HE.input SetProps
   }
 
 
 render ∷ State → HTML
-render {color, drag} =
+render {color, props} =
   HH.div
-    [ HP.classes [ HH.ClassName "ColorPicker"]]
+    [ HP.classes [ HH.ClassName "ColorPicker"]
+    , HCSS.style do
+      CSS.backgroundColor color
+      CSS.color if Color.isLight color
+        then CSS.black
+        else CSS.white
+    ]
     [ HH.div
       [ HP.classes [ HH.ClassName "ColorPicker-color"]
-      , HCSS.style $ CSS.backgroundColor $ pureHue $ orDefault color
-      , HE.onMouseDown $ HE.input (Left >>> DragStart)
-      , HE.onTouchStart $ HE.input (Right >>> DragStart)
+      , HCSS.style do
+          CSS.width $ CSS.px $ toNumber props.mainRectWidth
+          CSS.backgroundColor $ Color.hsl hsl.h 1.0 0.5
+      , HE.onMouseDown $ HE.input (Left >>> FieldDragStart)
+      , HE.onTouchStart $ HE.input (Right >>> FieldDragStart)
       ]
-      [ HH.div [ HP.classes [ HH.ClassName "ColorPicker-saturation"]] []
-      , HH.div [ HP.classes [ HH.ClassName "ColorPicker-brightness"]] []
+      [ HH.div [ HP.classes [ HH.ClassName "ColorPicker-field"]] []
       , HH.div
-        [ HP.classes [ HH.ClassName "ColorPicker-sbSelector"]
-        , HCSS.style $ case color of
-            Nothing → CSS.display CSS.displayNone
-            Just c → do
-              CSS.backgroundColor c
-              CSS.borderColor $ if Color.isLight c
-                then CSS.black
-                else CSS.white
+        [ HP.classes [ HH.ClassName "ColorPicker-fieldSelector"]
+        , HCSS.style do
+            CSS.display CSS.block
+            CSS.left $ CSS.pct (hsl.s * 100.0)
+            CSS.bottom $ CSS.pct (hsl.l * 100.0)
+            CSS.backgroundColor color
         ]
         []
       ]
     , HH.div
-      [ HP.classes [ HH.ClassName "ColorPicker-hue"]]
+      [ HP.classes
+        [ HH.ClassName "ColorPicker-slider"]
+        , HCSS.style do
+            CSS.width $ CSS.px $ toNumber props.hueRectWidth
+        , HE.onMouseDown $ HE.input (Left >>> SliderDragStart)
+        , HE.onTouchStart $ HE.input (Right >>> SliderDragStart)
+        ]
       [ HH.div
         [ HP.classes
-          [ HH.ClassName "ColorPicker-hSelector"]
-          , let
-              hue = getHue $ orDefault color
-            in
-              HCSS.style do
-                CSS.top $ CSS.pct (hue / 360.0 * 100.0)
+          [ HH.ClassName "ColorPicker-sliderSelector"]
+          , HCSS.style do
+              CSS.top $ CSS.pct ((1.0 - hsl.h / 360.0) * 100.0)
           ]
           []
       ]
-    , HH.pre [HP.classes [HH.ClassName "debug"]] [HH.text $ prettyJson drag]
     ]
-
+  where
+  hsl = Color.toHSLA color
 
 eval ∷ ∀ m r. MonadAff (PickerEffects r) m ⇒ Query ~> DSL m
-eval (NoOp next) = pure next
-eval (DragMove drag next) = do
-  case drag of
-    Drag.Move event dragData -> do
-      H.modify _{drag = Just dragData}
-    Drag.Done event -> do
-      H.modify _{drag = Nothing}
+eval (SetProps props next) = do
+  H.modify _{props = spy props}
   pure next
-eval (DragStart event next) = do
+eval (FieldDragMove drag next) = do
+  case drag of
+    Drag.Move event dragData → do
+      {color} <- H.get
+      let
+        hsl = Color.toHSLA color
+        s = dragData.progress.x
+        l = 1.0 - dragData.progress.y
+      H.modify _
+        { color = Color.hsl hsl.h s l
+        }
+    Drag.Done event → pure unit
+  pure next
+eval (SliderDragMove drag next) = do
+  case drag of
+    Drag.Move event dragData → do
+      {color} <- H.get
+      let
+        h = (1.0 - dragData.progress.y) * 360.0
+        hsl = Color.toHSLA color
+      H.modify _
+        { color = Color.hsl h hsl.s hsl.l
+        }
+    Drag.Done event → pure unit
+  pure next
+eval (SliderDragStart event next) = startDrag SliderDragMove event next
+eval (FieldDragStart event next) = startDrag FieldDragMove event next
+
+startDrag
+  ∷ ∀ a m r. MonadAff (PickerEffects r) m
+  ⇒ (∀ a. Drag.DragEvent → a → Query a)
+  → Drag.CursorEvent
+  → a
+  → DSL m a
+startDrag action event next = do
   H.subscribe $ Drag.dragEventSource event \drag →
-    Just (DragMove drag H.Listening)
+    Just (action drag H.Listening)
   liftEff $ either preventDefault preventDefault event
-  let position = Drag.cursorEventToPosition event
-  let node = Drag.cursorEventToTarget event
-  initialDragData <- H.liftEff $
-    Drag.mkDragData { prev: position , init: position } event node
-  eval $ DragMove (Drag.Move event initialDragData) next
-
-orDefault ∷ Maybe Color.Color → Color.Color
-orDefault = fromMaybe (Color.hsl 180.0 0.0 0.0)
-
-pureHue ∷ Color.Color → Color.Color
-pureHue c = Color.hsl (getHue c) 1.0 0.5
-
-getHue∷ Color.Color → Number
-getHue = Color.toHSLA >>> _.h
-
-getSaturation∷ Color.Color → Number
-getSaturation = Color.toHSLA >>> _.s
-
-getLightness∷ Color.Color → Number
-getLightness = Color.toHSLA >>> _.l
-
-foreign import prettyJson ∷ ∀ a. a → String
+  initialDragData <- liftEff $ Drag.mkFirstDragData event
+  eval $ action (Drag.Move event initialDragData) next

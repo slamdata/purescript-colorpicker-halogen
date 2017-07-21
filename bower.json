@@ -20,13 +20,14 @@
     "example"
   ],
   "dependencies": {
-    "purescript-colors": "^3.0.0",
+    "purescript-colors": "git://github.com/safareli/purescript-colors.git#hue",
     "purescript-halogen": "^2.1.0",
     "purescript-halogen-css": "^6.0.0",
     "purescript-dom-classy": "^2.1.0",
-    "purescript-dom": "git://github.com/safareli/purescript-dom.git#mousepagexy"
+    "purescript-dom": "^4.7.0"
   },
   "resolutions": {
-    "purescript-dom": "mousepagexy"
+    "purescript-dom": "mousepagexy",
+    "purescript-colors": "hue"
   }
 }

@@ -45,9 +45,10 @@ example = H.parentComponent
     }
 
 render ∷ ∀ m r. MonadAff (CPicker.PickerEffects r) m => State → HTML m
-render _ = HH.div_
+render _ = HH.div_ $ 
   -- [ HH.h1_ [ HH.text "Picker 1" ]] <>
-  [ HH.slot' cpColor 0 CPicker.picker unit (HE.input (HandleMsg 0))]
+  [ HH.slot' cpColor 0 CPicker.picker {mainRectWidth: 200, hueRectWidth: 30} (HE.input (HandleMsg 0))] <>
+  [ HH.slot' cpColor 1 CPicker.picker {mainRectWidth: 300, hueRectWidth: 30} (HE.input (HandleMsg 1))]
 
 eval ∷ ∀ m. Query ~> DSL m
 eval (HandleMsg _ _ next) = pure next
