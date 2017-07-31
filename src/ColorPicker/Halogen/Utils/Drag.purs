@@ -5,10 +5,7 @@ module ColorPicker.Halogen.Utils.Drag
   , DragEvent(..)
   , DragEffects
   , Position
-  , cursorEventToPosition
-  , cursorEventToTarget
   , mkFirstDragData
-  , mkDragData
   ) where
 
 import Prelude
