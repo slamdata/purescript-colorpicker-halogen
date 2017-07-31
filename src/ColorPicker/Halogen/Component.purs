@@ -10,7 +10,6 @@ import DOM.Classy.Event (preventDefault)
 import Data.Either (Either(..), either)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..))
-import Debug.Trace (spy)
 import Halogen (liftEff)
 import Halogen as H
 import Halogen.HTML as HH
@@ -24,10 +23,12 @@ type State =
   }
 
 type Message = Unit
+
 type Props =
   { mainRectWidth ∷ Int
   , hueRectWidth ∷ Int
   }
+
 data Query a
   = SetProps Props a
   | FieldDragStart Drag.CursorEvent a
@@ -36,6 +37,7 @@ data Query a
   | SliderDragMove Drag.DragEvent a
 
 type HTML = H.ComponentHTML Query
+
 type DSL m = H.ComponentDSL State Query Message m
 
 type PickerEffects r = Drag.DragEffects r
@@ -45,10 +47,7 @@ initialColor = Color.hsl 182.4 0.49 0.64
 
 picker ∷ ∀ m r. MonadAff (PickerEffects r) m ⇒ H.Component HH.HTML Query Props Message m
 picker = H.component
-  { initialState: \props ->
-      { color: initialColor
-      , props
-      }
+  { initialState: { color: initialColor, props: _ }
   , render
   , eval
   , receiver: HE.input SetProps
@@ -60,10 +59,10 @@ render {color, props} =
   HH.div
     [ HP.classes [ HH.ClassName "ColorPicker"]
     , HCSS.style do
-      CSS.backgroundColor color
-      CSS.color if Color.isLight color
-        then CSS.black
-        else CSS.white
+        CSS.backgroundColor color
+        CSS.color if Color.isLight color
+          then CSS.black
+          else CSS.white
     ]
     [ HH.div
       [ HP.classes [ HH.ClassName "ColorPicker-color"]
@@ -106,12 +105,12 @@ render {color, props} =
 
 eval ∷ ∀ m r. MonadAff (PickerEffects r) m ⇒ Query ~> DSL m
 eval (SetProps props next) = do
-  H.modify _{props = spy props}
+  H.modify _{props = props}
   pure next
 eval (FieldDragMove drag next) = do
   case drag of
     Drag.Move event dragData → do
-      {color} <- H.get
+      {color} ← H.get
       let
         hsl = Color.toHSLA color
         s = dragData.progress.x
@@ -124,7 +123,7 @@ eval (FieldDragMove drag next) = do
 eval (SliderDragMove drag next) = do
   case drag of
     Drag.Move event dragData → do
-      {color} <- H.get
+      {color} ← H.get
       let
         h = (1.0 - dragData.progress.y) * 360.0
         hsl = Color.toHSLA color
@@ -138,7 +137,7 @@ eval (FieldDragStart event next) = startDrag FieldDragMove event next
 
 startDrag
   ∷ ∀ a m r. MonadAff (PickerEffects r) m
-  ⇒ (∀ a. Drag.DragEvent → a → Query a)
+  ⇒ (∀ b. Drag.DragEvent → b → Query b)
   → Drag.CursorEvent
   → a
   → DSL m a
@@ -146,5 +145,5 @@ startDrag action event next = do
   H.subscribe $ Drag.dragEventSource event \drag →
     Just (action drag H.Listening)
   liftEff $ either preventDefault preventDefault event
-  initialDragData <- liftEff $ Drag.mkFirstDragData event
+  initialDragData ← liftEff $ Drag.mkFirstDragData event
   eval $ action (Drag.Move event initialDragData) next

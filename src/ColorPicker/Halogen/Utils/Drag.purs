@@ -21,7 +21,8 @@ import Control.Monad.Eff.Ref (REF, newRef, readRef, writeRef)
 import Control.Monad.Except (runExcept)
 import DOM (DOM)
 import DOM.Classy.Event (target)
-import DOM.Classy.HTMLElement (getBoundingClientRect, DOMRect)
+import DOM.Classy.HTMLElement (getBoundingClientRect)
+import DOM.HTML.HTMLElement (DOMRect)
 import DOM.Classy.Node (fromNode)
 import DOM.Event.EventTarget (EventListener, eventListener, addEventListener, removeEventListener)
 import DOM.Event.MouseEvent as MouseE
@@ -85,7 +86,7 @@ dragEventSource cursorEvent = ES.eventSource' \emit → do
     cursorMove ∷ EventListener (DragEffects eff)
     cursorMove = eventListener $ onCursorEvent \event → do
       prevPos ← readRef posRef
-      dragData <- mkDragData {prev:prevPos, init: initPos} event node
+      dragData ← mkDragData {prev:prevPos, init: initPos} event node
       writeRef posRef dragData.page
       emit $ Move event dragData
 
