@@ -47,9 +47,22 @@ example = H.parentComponent
 render ∷ ∀ m r. MonadAff (CPicker.PickerEffects r) m => State → HTML m
 render _ = HH.div_
   $  [ HH.h1_ [ HH.text "Picker 1" ]]
-  <> [ HH.slot' cpColor 0 CPicker.picker {mainRectWidth: 200, hueRectWidth: 30} (HE.input (HandleMsg 0))]
+  <> [ HH.slot' cpColor 0 CPicker.picker config0 (HE.input (HandleMsg 0))]
   <> [ HH.h1_ [ HH.text "Picker 2" ]]
-  <> [ HH.slot' cpColor 1 CPicker.picker {mainRectWidth: 300, hueRectWidth: 30} (HE.input (HandleMsg 1))]
+  <> [ HH.slot' cpColor 1 CPicker.picker config1 (HE.input (HandleMsg 1))]
 
 eval ∷ ∀ m. Query ~> DSL m
 eval (HandleMsg _ _ next) = pure next
+
+config0 ∷ CPicker.Props
+config0 =
+  { fieldRectWidth: 200
+  , sliderRectWidth: 30
+  , editing: [CPicker.componentHue <> CPicker.componentSL]
+  }
+config1 ∷ CPicker.Props
+config1 =
+  { fieldRectWidth: 260
+  , sliderRectWidth: 30
+  , editing: [CPicker.componentHue <> CPicker.componentSV <> CPicker.componentHEX, CPicker.componentRGB]
+  }
