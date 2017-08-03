@@ -34,19 +34,19 @@ type State =
 
 type Message = Unit
 
-componentHue :: Array ColorComponent
+componentHue ∷ Array ColorComponent
 componentHue = [Hue]
 
-componentSL :: Array ColorComponent
+componentSL ∷ Array ColorComponent
 componentSL = [HSL_S, HSL_L]
 
-componentSV :: Array ColorComponent
+componentSV ∷ Array ColorComponent
 componentSV = [HSV_S, HSV_V]
 
-componentRGB :: Array ColorComponent
+componentRGB ∷ Array ColorComponent
 componentRGB = [Red, Green, Blue]
 
-componentHEX :: Array ColorComponent
+componentHEX ∷ Array ColorComponent
 componentHEX = [HEX]
 
 type ColorComponentGroups = Array ColorComponents
@@ -79,7 +79,7 @@ data Query a
   | FieldDragMove Drag.DragEvent a
   | SliderDragStart Drag.CursorEvent a
   | SliderDragMove Drag.DragEvent a
-  | ComponentUpdate (Color.Color -> Maybe Color.Color) a
+  | ComponentUpdate (Color.Color → Maybe Color.Color) a
   | Init a
 
 type ChildQuery = Coproduct.Coproduct2 (Num.Query Number) (PatternInput.Query Color.Color)
@@ -166,45 +166,45 @@ render {color, props} =
       [ HP.classes props.editingClasses ]
       (renderEditingItem props <$> props.editing )
 
-renderEditingItem :: ∀ m. Props -> ColorComponents  -> HTML m
+renderEditingItem ∷ ∀ m. Props → ColorComponents  → HTML m
 renderEditingItem props x = HH.div [ HP.classes props.editingItemClasses ] $ x <#> case _ of
-  Hue   -> embedNum hasValRound Hue   $ mkConf props confHue
-  HSV_S -> embedNum hasValRound HSV_S $ mkConf props confSaturation
-  HSV_V -> embedNum hasValRound HSV_V $ mkConf props confValue
-  HSL_S -> embedNum hasValRound HSL_S $ mkConf props confSaturation
-  HSL_L -> embedNum hasValRound HSL_L $ mkConf props confLightness
-  Red   -> embedNum hasvalCail  Red   $ mkConf props confRed
-  Green -> embedNum hasvalCail  Green $ mkConf props confGreen
-  Blue  -> embedNum hasvalCail  Blue  $ mkConf props confBlue
-  HEX   -> renderHex
+  Hue   → embedNum hasValRound Hue   $ mkConf props confHue
+  HSV_S → embedNum hasValRound HSV_S $ mkConf props confSaturation
+  HSV_V → embedNum hasValRound HSV_V $ mkConf props confValue
+  HSL_S → embedNum hasValRound HSL_S $ mkConf props confSaturation
+  HSL_L → embedNum hasValRound HSL_L $ mkConf props confLightness
+  Red   → embedNum hasvalCail  Red   $ mkConf props confRed
+  Green → embedNum hasvalCail  Green $ mkConf props confGreen
+  Blue  → embedNum hasvalCail  Blue  $ mkConf props confBlue
+  HEX   → renderHex
 
   where
-  hasValRound :: Num.HasNumberInputVal Number
+  hasValRound ∷ Num.HasNumberInputVal Number
   hasValRound = Num.numberHasNumberInputVal
     {fromString = Num.numberHasNumberInputVal.fromString >>> map roundFractionalNum}
 
-  hasvalCail :: Num.HasNumberInputVal Number
+  hasvalCail ∷ Num.HasNumberInputVal Number
   hasvalCail = Num.numberHasNumberInputVal
     {fromString = Num.numberHasNumberInputVal.fromString >>> map roundNum}
 
-  embedNum :: Num.HasNumberInputVal Number -> ColorComponent -> Num.Config Number -> HTML m
+  embedNum ∷ Num.HasNumberInputVal Number → ColorComponent → Num.Config Number → HTML m
   embedNum hasVal component conf = input conf.placeholder
     $ HH.slot' cpColorComponent component (Num.input hasVal conf) unit
-    $ HE.input \(Num.NotifyChange val) -> ComponentUpdate $ \color ->
-        val <#> \n -> do
+    $ HE.input \(Num.NotifyChange val) → ComponentUpdate $ \color →
+        val <#> \n → do
           case component of
-            Hue   -> modifyHSL (_{h = n}) color
-            HSL_S -> modifyHSL (_{s = n / 100.0}) color
-            HSL_L -> modifyHSL (_{l = n / 100.0}) color
-            HSV_S -> modifyHSV (_{s = n / 100.0}) color
-            HSV_V -> modifyHSV (_{v = n / 100.0}) color
-            Red   -> modifyRGB (_{r = asInt n}) color
-            Green -> modifyRGB (_{g = asInt n}) color
-            Blue  -> modifyRGB (_{b = asInt n}) color
-            HEX   -> color -- hex values will not be comming from Number input
+            Hue   → modifyHSL (_{h = n}) color
+            HSL_S → modifyHSL (_{s = n / 100.0}) color
+            HSL_L → modifyHSL (_{l = n / 100.0}) color
+            HSV_S → modifyHSV (_{s = n / 100.0}) color
+            HSV_V → modifyHSV (_{v = n / 100.0}) color
+            Red   → modifyRGB (_{r = asInt n}) color
+            Green → modifyRGB (_{g = asInt n}) color
+            Blue  → modifyRGB (_{b = asInt n}) color
+            HEX   → color -- hex values will not be comming from Number input
     where
     asInt = floor
-  input :: String -> HTML m -> HTML m
+  input ∷ String → HTML m → HTML m
   input label child =
     HH.label [HP.classes props.inputClasses]
       [ HH.span [HP.classes props.inputLabelClasses] [HH.text label]
@@ -212,19 +212,19 @@ renderEditingItem props x = HH.div [ HP.classes props.editingItemClasses ] $ x <
       ]
   renderHex = input "#"
     $ HH.slot' cpColorComponentHex unit (PatternInput.input
-      { fromString: \str -> Color.fromHexString $ "#" <> str
-      , toString: \color -> String.toUpper $ String.drop 1 $ Color.toHexString color
+      { fromString: \str → Color.fromHexString $ "#" <> str
+      , toString: \color → String.toUpper $ String.drop 1 $ Color.toHexString color
       }
       { title: "Hex"
       , placeholder: "HEX"
       , root: props.inputElemClasses
       , rootInvalid: props.inputElemInvalidClasses
       }) unit
-    $ HE.input \(PatternInput.NotifyChange val) -> ComponentUpdate $ const val
+    $ HE.input \(PatternInput.NotifyChange val) → ComponentUpdate $ const val
 
 type PreNumConf a = { title ∷ String, placeholder ∷ String, range ∷ Range a }
 
-mkConf ∷ ∀ a. Props -> PreNumConf a -> Num.Config a
+mkConf ∷ ∀ a. Props → PreNumConf a → Num.Config a
 mkConf props { title, placeholder, range } =
   { title
   , placeholder
@@ -283,22 +283,22 @@ confValue =
 
 
 
-propagate :: ∀ m. DSL m Unit
+propagate ∷ ∀ m. DSL m Unit
 propagate = do
-  { color, props: { editing }} <- H.get
+  { color, props: { editing }} ← H.get
   let hsl = Color.toHSLA color
   let hsv = Color.toHSVA color
   let rgb = Color.toRGBA color
   for_ (fold editing) $ case _ of
-    Hue   -> H.query' cpColorComponent Hue   (set $ roundFractionalNum hsl.h) >>= mustBeMounted
-    HSL_S -> H.query' cpColorComponent HSL_S (set $ roundFractionalNum $ 100.0 * hsl.s) >>= mustBeMounted
-    HSL_L -> H.query' cpColorComponent HSL_L (set $ roundFractionalNum $ 100.0 * hsl.l) >>= mustBeMounted
-    HSV_S -> H.query' cpColorComponent HSV_S (set $ roundFractionalNum $ 100.0 * hsv.s) >>= mustBeMounted
-    HSV_V -> H.query' cpColorComponent HSV_V (set $ roundFractionalNum $ 100.0 * hsv.v) >>= mustBeMounted
-    Red   -> H.query' cpColorComponent Red   (set $ roundNum $ toNumber rgb.r) >>= mustBeMounted
-    Green -> H.query' cpColorComponent Green (set $ roundNum $ toNumber rgb.g) >>= mustBeMounted
-    Blue  -> H.query' cpColorComponent Blue  (set $ roundNum $ toNumber rgb.b) >>= mustBeMounted
-    HEX   -> H.query' cpColorComponentHex unit (H.action $ PatternInput.SetValue $ Just $ color) >>= mustBeMounted
+    Hue   → H.query' cpColorComponent Hue   (set $ roundFractionalNum hsl.h) >>= mustBeMounted
+    HSL_S → H.query' cpColorComponent HSL_S (set $ roundFractionalNum $ 100.0 * hsl.s) >>= mustBeMounted
+    HSL_L → H.query' cpColorComponent HSL_L (set $ roundFractionalNum $ 100.0 * hsl.l) >>= mustBeMounted
+    HSV_S → H.query' cpColorComponent HSV_S (set $ roundFractionalNum $ 100.0 * hsv.s) >>= mustBeMounted
+    HSV_V → H.query' cpColorComponent HSV_V (set $ roundFractionalNum $ 100.0 * hsv.v) >>= mustBeMounted
+    Red   → H.query' cpColorComponent Red   (set $ roundNum $ toNumber rgb.r) >>= mustBeMounted
+    Green → H.query' cpColorComponent Green (set $ roundNum $ toNumber rgb.g) >>= mustBeMounted
+    Blue  → H.query' cpColorComponent Blue  (set $ roundNum $ toNumber rgb.b) >>= mustBeMounted
+    HEX   → H.query' cpColorComponentHex unit (H.action $ PatternInput.SetValue $ Just $ color) >>= mustBeMounted
   where
   set n = H.action (Num.SetValue $ Just $ roundFractionalNum n)
 
@@ -308,8 +308,8 @@ eval (Init next) = do
   propagate
   pure next
 eval (ComponentUpdate update next) = do
-  { color } <- H.get
-  for_ (update color) $ \color' -> do
+  { color } ← H.get
+  for_ (update color) $ \color' → do
     H.modify _{ color = color'}
     propagate
   pure next
@@ -365,27 +365,27 @@ type RecordHSLA = { h ∷ Number, s ∷ Number, l ∷ Number, a ∷ Number }
 type RecordHSVA = { h ∷ Number, s ∷ Number, v ∷ Number, a ∷ Number }
 type RecordRGBA = { r ∷ Int, g ∷ Int, b ∷ Int, a ∷ Number }
 
-modifyHSL ∷ (RecordHSLA → RecordHSLA) -> Color.Color -> Color.Color
-modifyHSL f c = case f (Color.toHSLA c) of {h, s, l, a} -> Color.hsla h s l a
+modifyHSL ∷ (RecordHSLA → RecordHSLA) → Color.Color → Color.Color
+modifyHSL f c = case f (Color.toHSLA c) of {h, s, l, a} → Color.hsla h s l a
 
-modifyHSV ∷ (RecordHSVA → RecordHSVA) -> Color.Color -> Color.Color
-modifyHSV f c = case f (Color.toHSVA c) of {h, s, v, a} -> Color.hsva h s v a
+modifyHSV ∷ (RecordHSVA → RecordHSVA) → Color.Color → Color.Color
+modifyHSV f c = case f (Color.toHSVA c) of {h, s, v, a} → Color.hsva h s v a
 
-modifyRGB ∷ (RecordRGBA → RecordRGBA) -> Color.Color -> Color.Color
-modifyRGB f c = case f (Color.toRGBA c) of {r, g, b, a} -> Color.rgba r g b a
+modifyRGB ∷ (RecordRGBA → RecordRGBA) → Color.Color → Color.Color
+modifyRGB f c = case f (Color.toRGBA c) of {r, g, b, a} → Color.rgba r g b a
 
 mustBeMounted ∷ ∀ s f g p o m a. Maybe a → H.HalogenM s f g p o m a
 mustBeMounted (Just x) = pure x
 mustBeMounted _ = halt "children must be mounted"
 
 
-roundFractionalNum :: Number -> Number
+roundFractionalNum ∷ Number → Number
 roundFractionalNum = roundFractionalNum' 0
 
-roundFractionalNum' :: Int -> Number -> Number
+roundFractionalNum' ∷ Int → Number → Number
 roundFractionalNum' digits n = roundNum (n * scalar) / scalar
   where
   scalar = pow 10.0 (toNumber $ digits + 2)
 
-roundNum :: Number -> Number
+roundNum ∷ Number → Number
 roundNum = round

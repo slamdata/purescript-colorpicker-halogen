@@ -128,7 +128,7 @@ cursorEventToPosition (Right e) =
       , y: toNumber $ TouchE.pageY t
       }
 
-scrollPosition :: ∀ r. Eff (dom ∷ DOM | r) Position
+scrollPosition ∷ ∀ r. Eff (dom ∷ DOM | r) Position
 scrollPosition = do
   w ← window
   x ← toNumber <$> scrollX w
@@ -198,7 +198,7 @@ mkDragData pos event node = do
 positionZero ∷ Position
 positionZero = { x: 0.0, y: 0.0 }
 
-mkFirstDragData :: ∀ r. CursorEvent → Eff ( dom ∷ DOM | r ) DragData
+mkFirstDragData ∷ ∀ r. CursorEvent → Eff ( dom ∷ DOM | r ) DragData
 mkFirstDragData event = do
   let position = cursorEventToPosition event
   let node = cursorEventToTarget event

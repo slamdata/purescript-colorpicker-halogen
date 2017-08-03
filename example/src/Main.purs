@@ -65,7 +65,7 @@ config1 = mkConf
   [ClassName "ColorPicker--large"]
   [CPicker.componentHue <> CPicker.componentSV <> CPicker.componentHEX, CPicker.componentRGB]
 
-mkConf ∷ Array ClassName -> CPicker.ColorComponentGroups -> CPicker.Props
+mkConf ∷ Array ClassName → CPicker.ColorComponentGroups → CPicker.Props
 mkConf root editing =
   { rootClasses: [ClassName "ColorPicker"] <> root
   , draggerClasses: [ClassName "ColorPicker-dragger"]
