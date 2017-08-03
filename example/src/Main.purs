@@ -3,11 +3,12 @@ module Main where
 import Prelude
 
 import ColorPicker.Halogen.Component as CPicker
-import Control.Monad.Eff (Eff)
 import Control.Monad.Aff.Class (class MonadAff)
+import Control.Monad.Eff (Eff)
 import Data.Either.Nested as Either
 import Data.Functor.Coproduct.Nested as Coproduct
 import Data.Maybe (Maybe(..))
+import Halogen (ClassName(..))
 import Halogen as H
 import Halogen.Aff as HA
 import Halogen.Component.ChildPath as CP
@@ -55,14 +56,29 @@ eval ∷ ∀ m. Query ~> DSL m
 eval (HandleMsg _ _ next) = pure next
 
 config0 ∷ CPicker.Props
-config0 =
-  { fieldRectWidth: 200
-  , sliderRectWidth: 30
-  , editing: [CPicker.componentHue <> CPicker.componentSL]
-  }
+config0 = mkConf
+  [ClassName "ColorPicker--small"]
+  [CPicker.componentHue <> CPicker.componentSL]
+
 config1 ∷ CPicker.Props
-config1 =
-  { fieldRectWidth: 260
-  , sliderRectWidth: 30
-  , editing: [CPicker.componentHue <> CPicker.componentSV <> CPicker.componentHEX, CPicker.componentRGB]
+config1 = mkConf
+  [ClassName "ColorPicker--large"]
+  [CPicker.componentHue <> CPicker.componentSV <> CPicker.componentHEX, CPicker.componentRGB]
+
+mkConf ∷ Array ClassName -> CPicker.ColorComponentGroups -> CPicker.Props
+mkConf root editing =
+  { rootClasses: [ClassName "ColorPicker"] <> root
+  , draggerClasses: [ClassName "ColorPicker-dragger"]
+  , fieldClasses: [ClassName "ColorPicker-field"]
+  , fieldGradientClasses: [ClassName "ColorPicker-fieldGradient"]
+  , fieldSelectorClasses: [ClassName "ColorPicker-fieldSelector"]
+  , sliderClasses: [ClassName "ColorPicker-slider"]
+  , sliderSelectorClasses: [ClassName "ColorPicker-sliderSelector"]
+  , editingClasses: [ClassName "ColorPicker-editing"]
+  , editingItemClasses: [ClassName "ColorPicker-editingItem"]
+  , inputClasses: [ClassName "ColorPicker-input"]
+  , inputLabelClasses: [ClassName "ColorPicker-inputLabel"]
+  , inputElemClasses: [ClassName "ColorPicker-inputElem"]
+  , inputElemInvalidClasses: [ClassName "ColorPicker-inputElem--invalid"]
+  , editing
   }

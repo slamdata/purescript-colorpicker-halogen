@@ -53,8 +53,19 @@ type ColorComponentGroups = Array ColorComponents
 type ColorComponents = Array ColorComponent
 
 type Props =
-  { fieldRectWidth ∷ Int
-  , sliderRectWidth ∷ Int
+  { rootClasses ∷ Array HH.ClassName
+  , draggerClasses ∷ Array HH.ClassName
+  , fieldClasses ∷ Array HH.ClassName
+  , fieldGradientClasses ∷ Array HH.ClassName
+  , fieldSelectorClasses ∷ Array HH.ClassName
+  , sliderClasses ∷ Array HH.ClassName
+  , sliderSelectorClasses ∷ Array HH.ClassName
+  , editingClasses ∷ Array HH.ClassName
+  , editingItemClasses ∷ Array HH.ClassName
+  , inputClasses ∷ Array HH.ClassName
+  , inputLabelClasses ∷ Array HH.ClassName
+  , inputElemClasses ∷ Array HH.ClassName
+  , inputElemInvalidClasses ∷ Array HH.ClassName
   , editing ∷ ColorComponentGroups
   }
 
@@ -102,7 +113,7 @@ picker = H.lifecycleParentComponent
 render ∷ ∀ m. State → HTML m
 render {color, props} =
   HH.div
-    [ HP.classes [ HH.ClassName "ColorPicker"]
+    [ HP.classes props.rootClasses
     , HCSS.style do
         -- TODO remove backgroundColor
         CSS.backgroundColor color
@@ -115,21 +126,19 @@ render {color, props} =
   hsv = Color.toHSVA color
   dragger =
     HH.div
-      [ HP.classes [ HH.ClassName "ColorPicker-dragger"] ]
+      [ HP.classes props.draggerClasses ]
       [ field, slider ]
 
   field =
     HH.div
-      [ HP.classes [ HH.ClassName "ColorPicker-field"]
-      , HCSS.style do
-          CSS.width $ CSS.px $ toNumber props.fieldRectWidth
-          CSS.backgroundColor $ Color.hsl hsv.h 1.0 0.5
+      [ HP.classes props.fieldClasses
+      , HCSS.style $ CSS.backgroundColor $ Color.hsl hsv.h 1.0 0.5
       , HE.onMouseDown $ HE.input (Left >>> FieldDragStart)
       , HE.onTouchStart $ HE.input (Right >>> FieldDragStart)
       ]
-      [ HH.div [ HP.classes [ HH.ClassName "ColorPicker-fieldGradient"]] []
+      [ HH.div [ HP.classes props.fieldGradientClasses] []
       , HH.div
-        [ HP.classes [ HH.ClassName "ColorPicker-fieldSelector"]
+        [ HP.classes props.fieldSelectorClasses
         , HCSS.style do
             CSS.display CSS.block
             CSS.left $ CSS.pct (hsv.s * 100.0)
@@ -141,37 +150,32 @@ render {color, props} =
 
   slider =
     HH.div
-      [ HP.classes
-        [ HH.ClassName "ColorPicker-slider"]
-        , HCSS.style do
-            CSS.width $ CSS.px $ toNumber props.sliderRectWidth
-        , HE.onMouseDown $ HE.input (Left >>> SliderDragStart)
-        , HE.onTouchStart $ HE.input (Right >>> SliderDragStart)
-        ]
+      [ HP.classes props.sliderClasses
+      , HE.onMouseDown $ HE.input (Left >>> SliderDragStart)
+      , HE.onTouchStart $ HE.input (Right >>> SliderDragStart)
+      ]
       [ HH.div
-        [ HP.classes
-          [ HH.ClassName "ColorPicker-sliderSelector"]
-          , HCSS.style do
-              CSS.top $ CSS.pct ((1.0 - hsv.h / 360.0) * 100.0)
-          ]
-          []
+        [ HP.classes props.sliderSelectorClasses
+        , HCSS.style $ CSS.top $ CSS.pct ((1.0 - hsv.h / 360.0) * 100.0)
+        ]
+        []
       ]
 
   editing =
     HH.div
-      [ HP.classes [ HH.ClassName "ColorPicker-editing"] ]
-      (renderEditingItem <$> props.editing )
+      [ HP.classes props.editingClasses ]
+      (renderEditingItem props <$> props.editing )
 
-renderEditingItem :: ∀ m. ColorComponents  -> HTML m
-renderEditingItem x = HH.div [ HP.classes [ HH.ClassName "ColorPicker-editingItem"] ] $ x <#> case _ of
-  Hue   -> embedNum hasValRound Hue   confHue
-  HSV_S -> embedNum hasValRound HSV_S confSaturation
-  HSV_V -> embedNum hasValRound HSV_V confValue
-  HSL_S -> embedNum hasValRound HSL_S confSaturation
-  HSL_L -> embedNum hasValRound HSL_L confLightness
-  Red   -> embedNum hasvalCail  Red   confRed
-  Green -> embedNum hasvalCail  Green confGreen
-  Blue  -> embedNum hasvalCail  Blue  confBlue
+renderEditingItem :: ∀ m. Props -> ColorComponents  -> HTML m
+renderEditingItem props x = HH.div [ HP.classes props.editingItemClasses ] $ x <#> case _ of
+  Hue   -> embedNum hasValRound Hue   $ mkConf props confHue
+  HSV_S -> embedNum hasValRound HSV_S $ mkConf props confSaturation
+  HSV_V -> embedNum hasValRound HSV_V $ mkConf props confValue
+  HSL_S -> embedNum hasValRound HSL_S $ mkConf props confSaturation
+  HSL_L -> embedNum hasValRound HSL_L $ mkConf props confLightness
+  Red   -> embedNum hasvalCail  Red   $ mkConf props confRed
+  Green -> embedNum hasvalCail  Green $ mkConf props confGreen
+  Blue  -> embedNum hasvalCail  Blue  $ mkConf props confBlue
   HEX   -> renderHex
 
   where
@@ -202,8 +206,8 @@ renderEditingItem x = HH.div [ HP.classes [ HH.ClassName "ColorPicker-editingIte
     asInt = floor
   input :: String -> HTML m -> HTML m
   input label child =
-    HH.label [HP.classes [HH.ClassName "ColorPicker-input"]]
-      [ HH.span [HP.classes [HH.ClassName "ColorPicker-inputLabel"]] [HH.text label]
+    HH.label [HP.classes props.inputClasses]
+      [ HH.span [HP.classes props.inputLabelClasses] [HH.text label]
       , child
       ]
   renderHex = input "#"
@@ -213,64 +217,65 @@ renderEditingItem x = HH.div [ HP.classes [ HH.ClassName "ColorPicker-editingIte
       }
       { title: "Hex"
       , placeholder: "HEX"
-      , root: [HH.ClassName "ColorPicker-inputElem", HH.ClassName "ColorPicker-inputElem--color"]
-      , rootInvalid: [HH.ClassName "ColorPicker-inputElem--invalid"]
+      , root: props.inputElemClasses
+      , rootInvalid: props.inputElemInvalidClasses
       }) unit
     $ HE.input \(PatternInput.NotifyChange val) -> ComponentUpdate $ const val
 
+type PreNumConf a = { title ∷ String, placeholder ∷ String, range ∷ Range a }
 
-mkConf ∷ ∀ a. { title ∷ String, placeholder ∷ String, range ∷ Range a } -> Num.Config a
-mkConf { title, placeholder, range } =
+mkConf ∷ ∀ a. Props -> PreNumConf a -> Num.Config a
+mkConf props { title, placeholder, range } =
   { title
   , placeholder
   , range
-  , root: [HH.ClassName "ColorPicker-inputElem"]
-  , rootInvalid: [HH.ClassName "ColorPicker-inputElem--invalid"]
-  , rootLength: \n -> [HH.ClassName $ "ColorPicker-inputElem--length-" <> show n]
+  , root: props.inputElemClasses
+  , rootInvalid: props.inputElemInvalidClasses
+  , rootLength: const []
   }
 
-confRed ∷ Num.Config Number
-confRed = mkConf
+confRed ∷ PreNumConf Number
+confRed =
   { title: "Red"
   , placeholder: "R"
   , range: MinMax 0.0 256.0
   }
 
-confGreen ∷ Num.Config Number
-confGreen = mkConf
+confGreen ∷ PreNumConf Number
+confGreen =
   { title: "Green"
   , placeholder: "G"
   , range: MinMax 0.0 256.0
   }
 
-confBlue ∷ Num.Config Number
-confBlue = mkConf
+confBlue ∷ PreNumConf Number
+confBlue =
   { title: "Blue"
   , placeholder: "B"
   , range: MinMax 0.0 256.0
   }
 
-confHue ∷ Num.Config Number
-confHue = mkConf
+confHue ∷ PreNumConf Number
+confHue =
   { title: "Hue"
   , placeholder: "H"
   , range: MinMax 0.0 360.0
   }
-confSaturation ∷ Num.Config Number
-confSaturation = mkConf
+confSaturation ∷ PreNumConf Number
+confSaturation =
   { title: "Saturation"
   , placeholder: "S"
   , range: MinMax 0.0 100.0
   }
-confLightness ∷ Num.Config Number
-confLightness = mkConf
+confLightness ∷ PreNumConf Number
+confLightness =
   { title: "Lightness"
   , placeholder: "L"
   , range: MinMax 0.0 100.0
   }
 
-confValue ∷ Num.Config Number
-confValue = mkConf
+confValue ∷ PreNumConf Number
+confValue =
   { title: "Value"
   , placeholder: "V"
   , range: MinMax 0.0 100.0
