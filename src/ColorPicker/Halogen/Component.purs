@@ -12,8 +12,8 @@ import Data.Either.Nested as Either
 import Data.Foldable (fold, for_)
 import Data.Functor.Coproduct.Nested as Coproduct
 import Data.Int (floor, toNumber)
-import Data.String as String
 import Data.Maybe (Maybe(..))
+import Data.String as String
 import Halogen (liftEff)
 import Halogen as H
 import Halogen.Component.ChildPath as CP
@@ -22,7 +22,7 @@ import Halogen.HTML.CSS as HCSS
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Query.HalogenM (halt)
-import Math (round)
+import Math (pow, round)
 import NumberInput.Halogen.Component as Num
 import NumberInput.Range (Range(..))
 import PatternInput.Halogen.Component as PatternInput
@@ -324,8 +324,8 @@ eval (FieldDragMove drag next) = do
       {color} ← H.get
       let
         hsv = Color.toHSVA color
-        s = roundFractionalNum $ dragData.progress.x
-        v = roundFractionalNum $ 1.0 - dragData.progress.y
+        s = roundFractionalNum' 2 $ (dragData.progress.x)
+        v = roundFractionalNum' 2 $ (1.0 - dragData.progress.y)
       H.modify _
         { color = Color.hsv hsv.h s v
         }
@@ -380,9 +380,12 @@ mustBeMounted _ = halt "children must be mounted"
 
 
 roundFractionalNum :: Number -> Number
-roundFractionalNum n = roundNum (n * scalar) / scalar
+roundFractionalNum = roundFractionalNum' 0
+
+roundFractionalNum' :: Int -> Number -> Number
+roundFractionalNum' digits n = roundNum (n * scalar) / scalar
   where
-  scalar = 100.0
+  scalar = pow 10.0 (toNumber $ digits + 2)
 
 roundNum :: Number -> Number
 roundNum = round
