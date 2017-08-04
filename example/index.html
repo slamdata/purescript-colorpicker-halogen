@@ -9,8 +9,9 @@ body {
 }
 
 .ColorPicker {
-  padding: 100px;
+  padding: 0.5em;
   display: inline-flex;
+  background: hsl(0, 0%, 80%);
 }
 
 .ColorPicker--small .ColorPicker-field  { width: 10em; }
@@ -73,8 +74,39 @@ body {
   height: 2px;
 }
 
+.ColorPicker-aside {
+  display: flex;
+  flex-direction: column;
+  margin-left: 0.25em
+}
+.ColorPicker-stage {
+  display: flex;
+  margin-bottom: 0.5em
+}
+.ColorPicker-colorBlockCurrent,
+.ColorPicker-colorBlockPrevious {
+  border-top: 1px solid;
+  border-bottom: 1px solid;
+  flex: 1 1 0%;
+  height: 1.5em;
+}
+
+.ColorPicker-colorBlockCurrent {
+  border-left: 1px solid;
+}
+
+.ColorPicker-colorBlockPrevious {
+  border-right: 1px solid;
+  cursor: pointer;
+}
+
+.ColorPicker-colorBlockPrevious:focus {
+  outline: -webkit-focus-ring-color auto 5px;
+}
+
 .ColorPicker-editing {
   display: flex;
+  flex: 1;
 }
 
 .ColorPicker-editingItem {
@@ -85,7 +117,7 @@ body {
 .ColorPicker-input {
     display: flex;
     height: 1.5em;
-    padding: 0.25em;
+    margin-bottom: 0.5em;
 }
 
 .ColorPicker-inputLabel {
@@ -100,9 +132,26 @@ body {
   padding: 0.3em;
   width: 5em;
 }
+
 .ColorPicker-inputElem--invalid {
   color: red;
 }
+
+.ColorPicker-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.ColorPicker-actionSet {
+  height: 2em;
+  border: 1px solid;
+  width: 6em;
+}
+
+.ColorPicker-actionSet:active {
+  box-shadow: 0 0 2px currentColor
+}
+
     </style>
   </head>
   <body>

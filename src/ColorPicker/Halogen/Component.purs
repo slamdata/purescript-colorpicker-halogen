@@ -3,6 +3,7 @@ module ColorPicker.Halogen.Component where
 import Prelude
 
 import CSS as CSS
+import Color (Color)
 import Color as Color
 import ColorPicker.Halogen.Utils.Drag as Drag
 import Control.Monad.Aff.Class (class MonadAff)
@@ -15,6 +16,7 @@ import Data.Int (floor, toNumber)
 import Data.Map (Map, lookup)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String as String
+import Debug.Trace (spy)
 import Halogen (liftEff)
 import Halogen as H
 import Halogen.Component.ChildPath as CP
@@ -28,12 +30,14 @@ import NumberInput.Halogen.Component as Num
 import NumberInput.Range (Range(..))
 import PatternInput.Halogen.Component as PatternInput
 
+
 type State =
-  { color ∷ Color.Color -- switch to Maybe Color
+  { colorCurrent ∷ Color
+  , colorNext ∷ Color
   , props ∷ Props
   }
 
-type Message = Unit
+data Message = NextChange Color | NotifyChange Color
 
 componentHue ∷ Array ColorComponent
 componentHue = [Hue]
@@ -53,7 +57,7 @@ componentHEX = [HEX]
 type ColorComponentGroups = Array ColorComponents
 type ColorComponents = Array ColorComponent
 
-classesFor :: Props -> ClassGroup -> Array HH.ClassName
+classesFor :: Props → ClassGroup → Array HH.ClassName
 classesFor {classes} key = fromMaybe [] $ lookup key classes
 
 data ClassGroup
@@ -64,12 +68,18 @@ data ClassGroup
   | FieldSelector
   | Slider
   | SliderSelector
+  | Aside
+  | Stage
+  | ColorBlockCurrent
+  | ColorBlockPrevious
   | Editing
   | EditingItem
   | Input
   | InputLabel
   | InputElem
   | InputElemInvalid
+  | Actions
+  | ActionSet
 
 derive instance classGroupEq ∷ Eq ClassGroup
 derive instance classGroupOrd ∷ Ord ClassGroup
@@ -89,16 +99,17 @@ data Query a
   | FieldDragMove Drag.DragEvent a
   | SliderDragStart Drag.CursorEvent a
   | SliderDragMove Drag.DragEvent a
-  | ComponentUpdate (Color.Color → Maybe Color.Color) a
+  | ComponentUpdate (Color → Maybe Color) a
+  | Commit a
   | Init a
 
-type ChildQuery = Coproduct.Coproduct2 (Num.Query Number) (PatternInput.Query Color.Color)
+type ChildQuery = Coproduct.Coproduct2 (Num.Query Number) (PatternInput.Query Color)
 type Slot = Either.Either2 ColorComponent Unit
 
 cpColorComponent ∷ CP.ChildPath (Num.Query Number) ChildQuery ColorComponent Slot
 cpColorComponent = CP.cp1
 
-cpColorComponentHex ∷ CP.ChildPath (PatternInput.Query Color.Color) ChildQuery Unit Slot
+cpColorComponentHex ∷ CP.ChildPath (PatternInput.Query Color) ChildQuery Unit Slot
 cpColorComponentHex = CP.cp2
 
 type HTML m = H.ParentHTML Query ChildQuery Slot m
@@ -107,12 +118,12 @@ type DSL m = H.ParentDSL State Query ChildQuery Slot Message m
 
 type PickerEffects r = Drag.DragEffects r
 
-initialColor ∷ Color.Color
-initialColor = Color.hsl 180.0 0.5 0.5
+initialColor ∷ Color
+initialColor = Color.hsl 0.0 0.0 0.0
 
 picker ∷ ∀ m r. MonadAff (PickerEffects r) m ⇒ H.Component HH.HTML Query Props Message m
 picker = H.lifecycleParentComponent
-  { initialState: { color: initialColor, props: _ }
+  { initialState: { colorCurrent: initialColor, colorNext: initialColor, props: _ }
   , render
   , eval
   , receiver: HE.input SetProps
@@ -121,22 +132,18 @@ picker = H.lifecycleParentComponent
   }
 
 render ∷ ∀ m. State → HTML m
-render {color, props} =
+render { colorCurrent, colorNext, props} =
   HH.div
-    [ HP.classes $ props `classesFor` Root
-    , HCSS.style do
-        -- TODO remove backgroundColor
-        CSS.backgroundColor color
-        CSS.color if Color.isLight color
-          then CSS.black
-          else CSS.white
-    ]
-    [ dragger, editing ]
+    [ HP.classes $ props `classesFor` Root ]
+    [ dragger, aside ]
   where
-  hsv = Color.toHSVA color
+  textColor c = CSS.color if Color.isLight c then CSS.black else CSS.white
+  hsv = Color.toHSVA $ colorNext
   dragger =
     HH.div
-      [ HP.classes $ props `classesFor` Dragger ]
+      [ HP.classes $ props `classesFor` Dragger
+      , HCSS.style $ textColor colorNext
+      ]
       [ field, slider ]
 
   field =
@@ -153,7 +160,7 @@ render {color, props} =
             CSS.display CSS.block
             CSS.left $ CSS.pct (hsv.s * 100.0)
             CSS.bottom $ CSS.pct (hsv.v * 100.0)
-            CSS.backgroundColor color
+            CSS.backgroundColor colorNext
         ]
         []
       ]
@@ -171,10 +178,44 @@ render {color, props} =
         []
       ]
 
+  aside =
+    HH.div
+      [ HP.classes $ props `classesFor` Aside ]
+      [stage, editing, actions]
+  stage =
+    HH.div
+      [ HP.classes $ props `classesFor` Stage ]
+      [ HH.div
+          [ HP.classes $ props `classesFor` ColorBlockCurrent
+          , HCSS.style do
+              CSS.backgroundColor colorNext
+              textColor colorNext
+          ]
+          []
+      , HH.div
+          [ HP.tabIndex 0
+          , HP.classes $ props `classesFor` ColorBlockPrevious
+          , HE.onClick $ HE.input (\_ → ComponentUpdate $ const $ Just colorCurrent)
+          , HCSS.style do
+              CSS.backgroundColor colorCurrent
+              textColor colorCurrent
+          ]
+          []
+      ]
+
   editing =
     HH.div
       [ HP.classes $ props `classesFor` Editing ]
       (renderEditingItem props <$> props.editing )
+  actions =
+    HH.div
+      [ HP.classes $ props `classesFor` Actions ]
+      [ HH.button
+          [ HP.classes $ props `classesFor` ActionSet
+          , HE.onClick $ HE.input \_ -> Commit
+          ]
+          [ HH.text "Set" ]
+      ]
 
 renderEditingItem ∷ ∀ m. Props → ColorComponents  → HTML m
 renderEditingItem props x = HH.div [ HP.classes $ props `classesFor` EditingItem ] $ x <#> case _ of
@@ -292,17 +333,28 @@ confValue =
   }
 
 
+updateColor :: ∀ m. State → Color → DSL m Unit
+updateColor state colorNext = do
+  H.put state{colorNext = colorNext}
+  H.raise $ NextChange colorNext
+  propagate
+
 
 eval ∷ ∀ m r. MonadAff (PickerEffects r) m ⇒ Query ~> DSL m
 eval = case _ of
   Init next → do
     propagate
     pure next
+  Commit next → do
+    state ← H.get
+    H.put $ state{colorCurrent = state.colorNext, colorNext = state.colorNext}
+    void $ map spy H.get
+    H.raise $ NotifyChange state.colorNext
+    pure next
   ComponentUpdate update next → do
-    { color } ← H.get
-    for_ (update color) $ \color' → do
-      H.modify _{ color = color'}
-      propagate
+    state ← H.get
+    for_ (update state.colorNext) $ \color' → do
+      updateColor state $ color'
     pure next
   SetProps props next → do
     H.modify _{props = props}
@@ -310,29 +362,25 @@ eval = case _ of
   FieldDragMove drag next → do
     case drag of
       Drag.Move event dragData → do
-        {color} ← H.get
+        state ← H.get
         let
+          color = state.colorNext
           hsv = Color.toHSVA color
           s = roundFractionalNum' 2 $ (dragData.progress.x)
           v = roundFractionalNum' 2 $ (1.0 - dragData.progress.y)
-        H.modify _
-          { color = Color.hsv hsv.h s v
-          }
+        updateColor state (Color.hsv hsv.h s v)
+        pure unit
       Drag.Done event → pure unit
-    propagate
     pure next
   SliderDragMove drag next → do
     case drag of
       Drag.Move event dragData → do
-        {color} ← H.get
+        state ← H.get
         let
           h = roundFractionalNum $ (1.0 - dragData.progress.y) * 360.0
-          hsl = Color.toHSLA color
-        H.modify _
-          { color = Color.hsl h hsl.s hsl.l
-          }
+          hsl = Color.toHSLA $ state.colorNext
+        updateColor state (Color.hsl h hsl.s hsl.l)
       Drag.Done event → pure unit
-    propagate
     pure next
   SliderDragStart event next → startDrag SliderDragMove event next
   FieldDragStart event next → startDrag FieldDragMove event next
@@ -350,12 +398,15 @@ eval = case _ of
     initialDragData ← liftEff $ Drag.mkFirstDragData event
     eval $ action (Drag.Move event initialDragData) next
 
+
 propagate ∷ ∀ m. DSL m Unit
 propagate = do
-  { color, props: { editing }} ← H.get
-  let hsl = Color.toHSLA color
-  let hsv = Color.toHSVA color
-  let rgb = Color.toRGBA color
+  { colorNext, props: { editing }} ← H.get
+  let
+    c = colorNext
+    hsl = Color.toHSLA c
+    hsv = Color.toHSVA c
+    rgb = Color.toRGBA c
   for_ (fold editing) $ case _ of
     Hue   → H.query' cpColorComponent Hue   (set $ roundFractionalNum hsl.h) >>= mustBeMounted
     HSL_S → H.query' cpColorComponent HSL_S (set $ roundFractionalNum $ 100.0 * hsl.s) >>= mustBeMounted
@@ -365,7 +416,7 @@ propagate = do
     Red   → H.query' cpColorComponent Red   (set $ roundNum $ toNumber rgb.r) >>= mustBeMounted
     Green → H.query' cpColorComponent Green (set $ roundNum $ toNumber rgb.g) >>= mustBeMounted
     Blue  → H.query' cpColorComponent Blue  (set $ roundNum $ toNumber rgb.b) >>= mustBeMounted
-    HEX   → H.query' cpColorComponentHex unit (H.action $ PatternInput.SetValue $ Just $ color) >>= mustBeMounted
+    HEX   → H.query' cpColorComponentHex unit (H.action $ PatternInput.SetValue $ Just $ c) >>= mustBeMounted
   where
   set n = H.action (Num.SetValue $ Just $ roundFractionalNum n)
 
@@ -373,13 +424,13 @@ type RecordHSLA = { h ∷ Number, s ∷ Number, l ∷ Number, a ∷ Number }
 type RecordHSVA = { h ∷ Number, s ∷ Number, v ∷ Number, a ∷ Number }
 type RecordRGBA = { r ∷ Int, g ∷ Int, b ∷ Int, a ∷ Number }
 
-modifyHSL ∷ (RecordHSLA → RecordHSLA) → Color.Color → Color.Color
+modifyHSL ∷ (RecordHSLA → RecordHSLA) → Color → Color
 modifyHSL f c = case f (Color.toHSLA c) of {h, s, l, a} → Color.hsla h s l a
 
-modifyHSV ∷ (RecordHSVA → RecordHSVA) → Color.Color → Color.Color
+modifyHSV ∷ (RecordHSVA → RecordHSVA) → Color → Color
 modifyHSV f c = case f (Color.toHSVA c) of {h, s, v, a} → Color.hsva h s v a
 
-modifyRGB ∷ (RecordRGBA → RecordRGBA) → Color.Color → Color.Color
+modifyRGB ∷ (RecordRGBA → RecordRGBA) → Color → Color
 modifyRGB f c = case f (Color.toRGBA c) of {r, g, b, a} → Color.rgba r g b a
 
 mustBeMounted ∷ ∀ s f g p o m a. Maybe a → H.HalogenM s f g p o m a
