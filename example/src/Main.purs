@@ -7,7 +7,9 @@ import Control.Monad.Aff.Class (class MonadAff)
 import Control.Monad.Eff (Eff)
 import Data.Either.Nested as Either
 import Data.Functor.Coproduct.Nested as Coproduct
+import Data.Map (fromFoldable)
 import Data.Maybe (Maybe(..))
+import Data.Tuple (Tuple(..))
 import Halogen (ClassName(..))
 import Halogen as H
 import Halogen.Aff as HA
@@ -67,18 +69,20 @@ config1 = mkConf
 
 mkConf ∷ Array ClassName → CPicker.ColorComponentGroups → CPicker.Props
 mkConf root editing =
-  { rootClasses: [ClassName "ColorPicker"] <> root
-  , draggerClasses: [ClassName "ColorPicker-dragger"]
-  , fieldClasses: [ClassName "ColorPicker-field"]
-  , fieldGradientClasses: [ClassName "ColorPicker-fieldGradient"]
-  , fieldSelectorClasses: [ClassName "ColorPicker-fieldSelector"]
-  , sliderClasses: [ClassName "ColorPicker-slider"]
-  , sliderSelectorClasses: [ClassName "ColorPicker-sliderSelector"]
-  , editingClasses: [ClassName "ColorPicker-editing"]
-  , editingItemClasses: [ClassName "ColorPicker-editingItem"]
-  , inputClasses: [ClassName "ColorPicker-input"]
-  , inputLabelClasses: [ClassName "ColorPicker-inputLabel"]
-  , inputElemClasses: [ClassName "ColorPicker-inputElem"]
-  , inputElemInvalidClasses: [ClassName "ColorPicker-inputElem--invalid"]
-  , editing
+  { editing
+  , classes: fromFoldable
+    [ Tuple CPicker.Root $ [ClassName "ColorPicker"] <> root
+    , Tuple CPicker.Dragger [ClassName "ColorPicker-dragger"]
+    , Tuple CPicker.Field [ClassName "ColorPicker-field"]
+    , Tuple CPicker.FieldGradient [ClassName "ColorPicker-fieldGradient"]
+    , Tuple CPicker.FieldSelector [ClassName "ColorPicker-fieldSelector"]
+    , Tuple CPicker.Slider [ClassName "ColorPicker-slider"]
+    , Tuple CPicker.SliderSelector [ClassName "ColorPicker-sliderSelector"]
+    , Tuple CPicker.Editing [ClassName "ColorPicker-editing"]
+    , Tuple CPicker.EditingItem [ClassName "ColorPicker-editingItem"]
+    , Tuple CPicker.Input [ClassName "ColorPicker-input"]
+    , Tuple CPicker.InputLabel [ClassName "ColorPicker-inputLabel"]
+    , Tuple CPicker.InputElem [ClassName "ColorPicker-inputElem"]
+    , Tuple CPicker.InputElemInvalid [ClassName "ColorPicker-inputElem--invalid"]
+    ]
   }

@@ -12,7 +12,8 @@ import Data.Either.Nested as Either
 import Data.Foldable (fold, for_)
 import Data.Functor.Coproduct.Nested as Coproduct
 import Data.Int (floor, toNumber)
-import Data.Maybe (Maybe(..))
+import Data.Map (Map, lookup)
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String as String
 import Halogen (liftEff)
 import Halogen as H
@@ -52,20 +53,29 @@ componentHEX = [HEX]
 type ColorComponentGroups = Array ColorComponents
 type ColorComponents = Array ColorComponent
 
+classesFor :: Props -> ClassGroup -> Array HH.ClassName
+classesFor {classes} key = fromMaybe [] $ lookup key classes
+
+data ClassGroup
+  = Root
+  | Dragger
+  | Field
+  | FieldGradient
+  | FieldSelector
+  | Slider
+  | SliderSelector
+  | Editing
+  | EditingItem
+  | Input
+  | InputLabel
+  | InputElem
+  | InputElemInvalid
+
+derive instance classGroupEq ∷ Eq ClassGroup
+derive instance classGroupOrd ∷ Ord ClassGroup
+
 type Props =
-  { rootClasses ∷ Array HH.ClassName
-  , draggerClasses ∷ Array HH.ClassName
-  , fieldClasses ∷ Array HH.ClassName
-  , fieldGradientClasses ∷ Array HH.ClassName
-  , fieldSelectorClasses ∷ Array HH.ClassName
-  , sliderClasses ∷ Array HH.ClassName
-  , sliderSelectorClasses ∷ Array HH.ClassName
-  , editingClasses ∷ Array HH.ClassName
-  , editingItemClasses ∷ Array HH.ClassName
-  , inputClasses ∷ Array HH.ClassName
-  , inputLabelClasses ∷ Array HH.ClassName
-  , inputElemClasses ∷ Array HH.ClassName
-  , inputElemInvalidClasses ∷ Array HH.ClassName
+  { classes ∷ Map ClassGroup (Array HH.ClassName)
   , editing ∷ ColorComponentGroups
   }
 
@@ -113,7 +123,7 @@ picker = H.lifecycleParentComponent
 render ∷ ∀ m. State → HTML m
 render {color, props} =
   HH.div
-    [ HP.classes props.rootClasses
+    [ HP.classes $ props `classesFor` Root
     , HCSS.style do
         -- TODO remove backgroundColor
         CSS.backgroundColor color
@@ -126,19 +136,19 @@ render {color, props} =
   hsv = Color.toHSVA color
   dragger =
     HH.div
-      [ HP.classes props.draggerClasses ]
+      [ HP.classes $ props `classesFor` Dragger ]
       [ field, slider ]
 
   field =
     HH.div
-      [ HP.classes props.fieldClasses
+      [ HP.classes $ props `classesFor` Field
       , HCSS.style $ CSS.backgroundColor $ Color.hsl hsv.h 1.0 0.5
       , HE.onMouseDown $ HE.input (Left >>> FieldDragStart)
       , HE.onTouchStart $ HE.input (Right >>> FieldDragStart)
       ]
-      [ HH.div [ HP.classes props.fieldGradientClasses] []
+      [ HH.div [ HP.classes $ props `classesFor` FieldGradient] []
       , HH.div
-        [ HP.classes props.fieldSelectorClasses
+        [ HP.classes $ props `classesFor` FieldSelector
         , HCSS.style do
             CSS.display CSS.block
             CSS.left $ CSS.pct (hsv.s * 100.0)
@@ -150,12 +160,12 @@ render {color, props} =
 
   slider =
     HH.div
-      [ HP.classes props.sliderClasses
+      [ HP.classes $ props `classesFor` Slider
       , HE.onMouseDown $ HE.input (Left >>> SliderDragStart)
       , HE.onTouchStart $ HE.input (Right >>> SliderDragStart)
       ]
       [ HH.div
-        [ HP.classes props.sliderSelectorClasses
+        [ HP.classes $ props `classesFor` SliderSelector
         , HCSS.style $ CSS.top $ CSS.pct ((1.0 - hsv.h / 360.0) * 100.0)
         ]
         []
@@ -163,11 +173,11 @@ render {color, props} =
 
   editing =
     HH.div
-      [ HP.classes props.editingClasses ]
+      [ HP.classes $ props `classesFor` Editing ]
       (renderEditingItem props <$> props.editing )
 
 renderEditingItem ∷ ∀ m. Props → ColorComponents  → HTML m
-renderEditingItem props x = HH.div [ HP.classes props.editingItemClasses ] $ x <#> case _ of
+renderEditingItem props x = HH.div [ HP.classes $ props `classesFor` EditingItem ] $ x <#> case _ of
   Hue   → embedNum hasValRound Hue   $ mkConf props confHue
   HSV_S → embedNum hasValRound HSV_S $ mkConf props confSaturation
   HSV_V → embedNum hasValRound HSV_V $ mkConf props confValue
@@ -206,8 +216,8 @@ renderEditingItem props x = HH.div [ HP.classes props.editingItemClasses ] $ x <
     asInt = floor
   input ∷ String → HTML m → HTML m
   input label child =
-    HH.label [HP.classes props.inputClasses]
-      [ HH.span [HP.classes props.inputLabelClasses] [HH.text label]
+    HH.label [HP.classes $ props `classesFor` Input]
+      [ HH.span [HP.classes $ props `classesFor` InputLabel] [HH.text label]
       , child
       ]
   renderHex = input "#"
@@ -217,8 +227,8 @@ renderEditingItem props x = HH.div [ HP.classes props.editingItemClasses ] $ x <
       }
       { title: "Hex"
       , placeholder: "HEX"
-      , root: props.inputElemClasses
-      , rootInvalid: props.inputElemInvalidClasses
+      , root: props `classesFor` InputElem
+      , rootInvalid: props `classesFor` InputElemInvalid
       }) unit
     $ HE.input \(PatternInput.NotifyChange val) → ComponentUpdate $ const val
 
@@ -229,8 +239,8 @@ mkConf props { title, placeholder, range } =
   { title
   , placeholder
   , range
-  , root: props.inputElemClasses
-  , rootInvalid: props.inputElemInvalidClasses
+  , root: props `classesFor` InputElem
+  , rootInvalid: props `classesFor` InputElemInvalid
   , rootLength: const []
   }
 
