@@ -75,9 +75,9 @@ eval (HandleMsg idx msg next) = do
   update state = insert idx val state
     where
     val = case lookup idx state, msg of
-      Just s, CPicker.NextChange next -> s{next = next}
-      _, CPicker.NextChange x -> { next: x, current: x }
-      _, CPicker.NotifyChange x ->  {next: x, current: x}
+      Just s, CPicker.NextChange next → s{next = next}
+      _, CPicker.NextChange x → { next: x, current: x }
+      _, CPicker.NotifyChange x →  {next: x, current: x}
 
 config0 ∷ CPicker.Props
 config0 = mkConf
@@ -97,7 +97,7 @@ config2 = mkConf
   [ClassName "ColorPicker--small"]
   [[ componentRedORNoRed ]]
 
-componentRedORNoRed :: C.ColorComponent
+componentRedORNoRed ∷ C.ColorComponent
 componentRedORNoRed = C.TextComponentSpec
   { hasInputVal:
       { fromString: \str → if str == "red" then Just (rgb 255 0 0) else Nothing

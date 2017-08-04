@@ -40,7 +40,7 @@ data Message = NextChange Color | NotifyChange Color
 type ColorComponentGroups = Array ColorComponents
 type ColorComponents = Array ColorComponent
 
-classesFor :: Props → ClassGroup → Array HH.ClassName
+classesFor ∷ Props → ClassGroup → Array HH.ClassName
 classesFor {classes} key = fromMaybe [] $ lookup key classes
 
 data ClassGroup
@@ -197,7 +197,7 @@ render { colorCurrent, colorNext, props} =
       [ HP.classes $ props `classesFor` Actions ]
       [ HH.button
           [ HP.classes $ props `classesFor` ActionSet
-          , HE.onClick $ HE.input \_ -> Commit
+          , HE.onClick $ HE.input \_ → Commit
           ]
           [ HH.text "Set" ]
       ]
@@ -299,7 +299,7 @@ startDrag action event next = do
   initialDragData ← liftEff $ Drag.mkFirstDragData event
   eval $ action (Drag.Move event initialDragData) next
 
-updateColor :: ∀ m. State → Color → DSL m Unit
+updateColor ∷ ∀ m. State → Color → DSL m Unit
 updateColor state colorNext = do
   H.put state{colorNext = colorNext}
   H.raise $ NextChange colorNext
@@ -314,7 +314,7 @@ propagate = do
       , hsv: Color.toHSVA colorNext
       , rgb: Color.toRGBA colorNext
       }
-  for_ (fold editing) $  \spec -> mustBeMounted =<< case spec of
+  for_ (fold editing) $  \spec → mustBeMounted =<< case spec of
     TextComponentSpec { key } →
       H.query' cpTextComponent key (H.action $ PatternInput.SetValue $ Just colorNext)
     NumberComponentSpec {key, read} →

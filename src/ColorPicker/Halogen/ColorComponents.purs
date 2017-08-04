@@ -209,7 +209,7 @@ confValue =
   }
 
 
-asInt :: Number -> Int
+asInt ∷ Number → Int
 asInt = floor
 
 hasValRound ∷ Num.HasNumberInputVal Number
