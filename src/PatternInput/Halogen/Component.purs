@@ -69,17 +69,18 @@ render hasInputVal conf value = HH.input
   ]
 
 eval ∷ ∀ val m . Eq val ⇒ HasInputVal val → Query val ~> DSL val m
-eval hasInputVal (SetValue val next) = do
-  prevVal ← H.get
-  unless (fst prevVal == val) (H.put $ Tuple val (maybe "" hasInputVal.toString val))
-  pure next
-eval _ (GetValue next) = H.get <#> (fst >>> next)
-eval hasInputVal (Update str next) = do
-  prevVal ← H.get
-  let nextVal = Tuple (hasInputVal.fromString str) str
-  H.put nextVal
-  unless (nextVal == prevVal) $ H.raise (NotifyChange $ fst nextVal)
-  pure next
+eval hasInputVal = case _ of
+  SetValue val next → do
+    prevVal ← H.get
+    unless (fst prevVal == val) (H.put $ Tuple val (maybe "" hasInputVal.toString val))
+    pure next
+  GetValue next → H.get <#> (fst >>> next)
+  Update str next → do
+    prevVal ← H.get
+    let nextVal = Tuple (hasInputVal.fromString str) str
+    H.put nextVal
+    unless (nextVal == prevVal) $ H.raise (NotifyChange $ fst nextVal)
+    pure next
 
 isInvalid  ∷ ∀ a. InputValue a → Boolean
 isInvalid (Tuple _       "") = false

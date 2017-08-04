@@ -293,6 +293,63 @@ confValue =
 
 
 
+eval ∷ ∀ m r. MonadAff (PickerEffects r) m ⇒ Query ~> DSL m
+eval = case _ of
+  Init next → do
+    propagate
+    pure next
+  ComponentUpdate update next → do
+    { color } ← H.get
+    for_ (update color) $ \color' → do
+      H.modify _{ color = color'}
+      propagate
+    pure next
+  SetProps props next → do
+    H.modify _{props = props}
+    pure next
+  FieldDragMove drag next → do
+    case drag of
+      Drag.Move event dragData → do
+        {color} ← H.get
+        let
+          hsv = Color.toHSVA color
+          s = roundFractionalNum' 2 $ (dragData.progress.x)
+          v = roundFractionalNum' 2 $ (1.0 - dragData.progress.y)
+        H.modify _
+          { color = Color.hsv hsv.h s v
+          }
+      Drag.Done event → pure unit
+    propagate
+    pure next
+  SliderDragMove drag next → do
+    case drag of
+      Drag.Move event dragData → do
+        {color} ← H.get
+        let
+          h = roundFractionalNum $ (1.0 - dragData.progress.y) * 360.0
+          hsl = Color.toHSLA color
+        H.modify _
+          { color = Color.hsl h hsl.s hsl.l
+          }
+      Drag.Done event → pure unit
+    propagate
+    pure next
+  SliderDragStart event next → startDrag SliderDragMove event next
+  FieldDragStart event next → startDrag FieldDragMove event next
+  where
+  startDrag
+    ∷ ∀ a
+    . (∀ b. Drag.DragEvent → b → Query b)
+    → Drag.CursorEvent
+    → a
+    → DSL m a
+  startDrag action event next = do
+    H.subscribe $ Drag.dragEventSource event \drag →
+      Just (action drag H.Listening)
+    liftEff $ either preventDefault preventDefault event
+    initialDragData ← liftEff $ Drag.mkFirstDragData event
+    eval $ action (Drag.Move event initialDragData) next
+
 propagate ∷ ∀ m. DSL m Unit
 propagate = do
   { color, props: { editing }} ← H.get
@@ -311,65 +368,6 @@ propagate = do
     HEX   → H.query' cpColorComponentHex unit (H.action $ PatternInput.SetValue $ Just $ color) >>= mustBeMounted
   where
   set n = H.action (Num.SetValue $ Just $ roundFractionalNum n)
-
-
-eval ∷ ∀ m r. MonadAff (PickerEffects r) m ⇒ Query ~> DSL m
-eval (Init next) = do
-  propagate
-  pure next
-eval (ComponentUpdate update next) = do
-  { color } ← H.get
-  for_ (update color) $ \color' → do
-    H.modify _{ color = color'}
-    propagate
-  pure next
-
-
-eval (SetProps props next) = do
-  H.modify _{props = props}
-  pure next
-eval (FieldDragMove drag next) = do
-  case drag of
-    Drag.Move event dragData → do
-      {color} ← H.get
-      let
-        hsv = Color.toHSVA color
-        s = roundFractionalNum' 2 $ (dragData.progress.x)
-        v = roundFractionalNum' 2 $ (1.0 - dragData.progress.y)
-      H.modify _
-        { color = Color.hsv hsv.h s v
-        }
-    Drag.Done event → pure unit
-  propagate
-  pure next
-eval (SliderDragMove drag next) = do
-  case drag of
-    Drag.Move event dragData → do
-      {color} ← H.get
-      let
-        h = roundFractionalNum $ (1.0 - dragData.progress.y) * 360.0
-        hsl = Color.toHSLA color
-      H.modify _
-        { color = Color.hsl h hsl.s hsl.l
-        }
-    Drag.Done event → pure unit
-  propagate
-  pure next
-eval (SliderDragStart event next) = startDrag SliderDragMove event next
-eval (FieldDragStart event next) = startDrag FieldDragMove event next
-
-startDrag
-  ∷ ∀ a m r. MonadAff (PickerEffects r) m
-  ⇒ (∀ b. Drag.DragEvent → b → Query b)
-  → Drag.CursorEvent
-  → a
-  → DSL m a
-startDrag action event next = do
-  H.subscribe $ Drag.dragEventSource event \drag →
-    Just (action drag H.Listening)
-  liftEff $ either preventDefault preventDefault event
-  initialDragData ← liftEff $ Drag.mkFirstDragData event
-  eval $ action (Drag.Move event initialDragData) next
 
 type RecordHSLA = { h ∷ Number, s ∷ Number, l ∷ Number, a ∷ Number }
 type RecordHSVA = { h ∷ Number, s ∷ Number, v ∷ Number, a ∷ Number }
