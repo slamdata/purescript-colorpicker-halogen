@@ -54,7 +54,7 @@ data ClassGroup
   | Aside
   | Stage
   | ColorBlockCurrent
-  | ColorBlockPrevious
+  | ColorBlockNext
   | Editing
   | EditingItem
   | Input
@@ -168,7 +168,8 @@ render { colorCurrent, colorNext, props} =
     HH.div
       [ HP.classes $ props `classesFor` Stage ]
       [ HH.div
-          [ HP.classes $ props `classesFor` ColorBlockCurrent
+          [ HP.classes $ props `classesFor` ColorBlockNext
+          , HP.title "Next value"
           , HCSS.style do
               CSS.backgroundColor colorNext
               textColor colorNext
@@ -176,7 +177,8 @@ render { colorCurrent, colorNext, props} =
           []
       , HH.div
           [ HP.tabIndex 0
-          , HP.classes $ props `classesFor` ColorBlockPrevious
+          , HP.classes $ props `classesFor` ColorBlockCurrent
+          , HP.title "Current value"
           , HE.onClick $ HE.input (\_ → ComponentUpdate $ const $ Just colorCurrent)
           , HCSS.style do
               CSS.backgroundColor colorCurrent

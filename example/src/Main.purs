@@ -124,7 +124,7 @@ mkConf root editing =
     , Tuple CPicker.Aside [ClassName "ColorPicker-aside"]
     , Tuple CPicker.Stage [ClassName "ColorPicker-stage"]
     , Tuple CPicker.ColorBlockCurrent [ClassName "ColorPicker-colorBlockCurrent"]
-    , Tuple CPicker.ColorBlockPrevious [ClassName "ColorPicker-colorBlockPrevious"]
+    , Tuple CPicker.ColorBlockNext [ClassName "ColorPicker-colorBlockNext"]
     , Tuple CPicker.Editing [ClassName "ColorPicker-editing"]
     , Tuple CPicker.EditingItem [ClassName "ColorPicker-editingItem"]
     , Tuple CPicker.Input [ClassName "ColorPicker-input"]
