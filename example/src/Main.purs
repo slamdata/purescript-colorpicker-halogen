@@ -2,7 +2,7 @@ module Main where
 
 import Prelude
 
-import Color (Color)
+import Color (Color, rgb)
 import ColorPicker.Halogen.Component as CPicker
 import Control.Monad.Aff.Class (class MonadAff)
 import Control.Monad.Eff (Eff)
@@ -19,6 +19,7 @@ import Halogen.Component.ChildPath as CP
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.VDom.Driver (runUI)
+import PatternInput.Halogen.ColorComponents as C
 
 main ∷ Eff (HA.HalogenEffects ()) Unit
 main = HA.runHalogenAff do
@@ -53,6 +54,7 @@ render ∷ ∀ m r. MonadAff (CPicker.PickerEffects r) m => State → HTML m
 render state = HH.div_
   $ renderPicker 0 config0
   <> renderPicker 1 config1
+  <> renderPicker 2 config2
 
   where
   renderPicker idx conf =
@@ -80,13 +82,34 @@ eval (HandleMsg idx msg next) = do
 config0 ∷ CPicker.Props
 config0 = mkConf
   [ClassName "ColorPicker--small"]
-  [CPicker.componentHue <> CPicker.componentSL]
+  [ [C.componentHue] <> C.componentSL
+  ]
 
 config1 ∷ CPicker.Props
 config1 = mkConf
   [ClassName "ColorPicker--large"]
-  [CPicker.componentHue <> CPicker.componentSV <> CPicker.componentHEX, CPicker.componentRGB]
+  [ [C.componentHue] <> C.componentSV <> [C.componentHEX]
+  , C.componentRGB
+  ]
 
+config2 ∷ CPicker.Props
+config2 = mkConf
+  [ClassName "ColorPicker--small"]
+  [[ componentRedORNoRed ]]
+
+componentRedORNoRed :: C.ColorComponent
+componentRedORNoRed = C.TextComponentSpec
+  { hasInputVal:
+      { fromString: \str → if str == "red" then Just (rgb 255 0 0) else Nothing
+      , toString: \color → if color == (rgb 255 0 0) then "red" else "nored"
+      }
+  , key: "Red"
+  , config:
+      { title: "red or nored?"
+      , prefix: "🛑"
+      , placeholder: "red"
+      }
+  }
 mkConf ∷ Array ClassName → CPicker.ColorComponentGroups → CPicker.Props
 mkConf root editing =
   { editing
