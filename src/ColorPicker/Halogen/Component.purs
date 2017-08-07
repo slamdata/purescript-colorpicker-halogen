@@ -16,15 +16,18 @@ import Prelude
 import CSS as CSS
 import Color (Color)
 import Color as Color
+import ColorPicker.Halogen.ColorComponents (ColorComponent(..), PreNumConf)
 import ColorPicker.Halogen.Utils.Drag as Drag
 import Control.Monad.Aff.Class (class MonadAff)
+import Control.MonadZero (guard)
 import DOM.Classy.Event (preventDefault)
-import Data.Either (Either(..), either)
+import Data.Either (Either(..), either, isLeft)
 import Data.Either.Nested as Either
-import Data.Foldable (fold, for_)
+import Data.Foldable (fold, foldMap, for_)
 import Data.Functor.Coproduct.Nested as Coproduct
-import Data.Map (Map, lookup)
+import Data.Map (Map, insert, lookup)
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Monoid (mempty)
 import Halogen (liftEff)
 import Halogen as H
 import Halogen.Component.ChildPath as CP
@@ -34,13 +37,12 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Query.HalogenM (halt)
 import NumberInput.Halogen.Component as Num
-import ColorPicker.Halogen.ColorComponents (ColorComponent(..), PreNumConf, PreTextConf)
-import TextInput.Halogen.Component as TextInput
 
 
 type ValueProgress a =  { current ∷ a, next ∷ a }
 type State =
   { color ∷ ValueProgress Color
+  , inputs ∷ Map String (Either String String)
   , props ∷ Props
   }
 
@@ -94,15 +96,14 @@ data Query a
   | Init a
   | GetValue (ValueProgress Color → a)
   | SetValue (ValueProgress Color) a
+  | UpdateTextInput String String (Maybe Color) a
 
-type ChildQuery = Coproduct.Coproduct2 (Num.Query Number) (TextInput.Query Color)
-type Slot = Either.Either2 String String
+type ChildQuery = Coproduct.Coproduct1 (Num.Query Number)
+type Slot = Either.Either1 String
 
 cpNumComponent ∷ CP.ChildPath (Num.Query Number) ChildQuery String Slot
 cpNumComponent = CP.cp1
 
-cpTextComponent ∷ CP.ChildPath (TextInput.Query Color) ChildQuery String Slot
-cpTextComponent = CP.cp2
 
 type HTML m = H.ParentHTML Query ChildQuery Slot m
 
@@ -115,7 +116,7 @@ initialColor = Color.hsl 0.0 0.0 0.0
 
 picker ∷ ∀ m r. MonadAff (PickerEffects r) m ⇒ H.Component HH.HTML Query Props Message m
 picker = H.lifecycleParentComponent
-  { initialState: { color: { current: initialColor, next: initialColor }, props: _ }
+  { initialState: { color: { current: initialColor, next: initialColor }, inputs: mempty, props: _ }
   , render
   , eval
   , receiver: HE.input SetProps
@@ -124,7 +125,7 @@ picker = H.lifecycleParentComponent
   }
 
 render ∷ ∀ m. State → HTML m
-render { color, props} =
+render state@{ color, inputs, props} =
   HH.div
     [ HP.classes $ props `classesFor` Root ]
     [ dragger, aside ]
@@ -202,7 +203,7 @@ render { color, props} =
   editing =
     HH.div
       [ HP.classes $ props `classesFor` Editing ]
-      (renderEditingItem props <$> props.editing )
+      (renderEditingItem state <$> props.editing )
 
   actions =
     HH.div
@@ -214,33 +215,31 @@ render { color, props} =
           [ HH.text "Set" ]
       ]
 
-renderEditingItem ∷ ∀ m. Props → ColorComponents → HTML m
-renderEditingItem props x = HH.div [ HP.classes $ props `classesFor` EditingItem ] $ x <#> renderItem
+renderEditingItem ∷ ∀ m. State -> ColorComponents → HTML m
+renderEditingItem { inputs, props } x = HH.div [ HP.classes $ props `classesFor` EditingItem ] $ x <#> renderItem
   where
   renderItem = case _ of
     NumberComponentSpec { key, hasNumVal, update, config } →
       input config.prefix
+        $ pure
         $ HH.slot' cpNumComponent key (Num.input hasNumVal (mkNumConf props config)) unit
         $ HE.input \(Num.NotifyChange val) → ComponentUpdate $ \color → update <$> val >>= (_ $ color)
-    TextComponentSpec { hasInputVal, key, config } →
-      input config.prefix
-        $ HH.slot' cpTextComponent key (TextInput.input hasInputVal (mkTextConfig props config)) unit
-        $ HE.input \(TextInput.NotifyChange val) → ComponentUpdate $ const val
+    TextComponentSpec { fromString, key, config } →
+      input config.prefix $ flip foldMap (lookup key inputs) \val -> pure $ HH.input
+        [ HP.type_ HP.InputText
+        , HP.classes
+          $  (props `classesFor` InputElem)
+          <> (guard (isLeft val) *> (props `classesFor` InputElemInvalid))
+        , HP.title config.title
+        , HP.placeholder config.placeholder
+        , HP.value $ either id id val
+        , HE.onValueInput $ HE.input $ \ str -> UpdateTextInput key str (fromString str)
+        ]
 
-  input ∷ String → HTML m → HTML m
+  input ∷ String → Array (HTML m) → HTML m
   input label child =
-    HH.label [HP.classes $ props `classesFor` Input]
-      [ HH.span [HP.classes $ props `classesFor` InputLabel] [HH.text label]
-      , child
-      ]
-
-mkTextConfig ∷ Props → PreTextConf → TextInput.Config
-mkTextConfig props { title, placeholder } =
-  { title
-  , placeholder
-  , root: props `classesFor` InputElem
-  , rootInvalid: props `classesFor` InputElemInvalid
-  }
+    HH.label [HP.classes $ props `classesFor` Input] $
+      [ HH.span [HP.classes $ props `classesFor` InputLabel] [HH.text label]] <> child
 
 mkNumConf ∷ ∀ a. Props → PreNumConf a → Num.Config a
 mkNumConf props { title, placeholder, range } =
@@ -254,6 +253,13 @@ mkNumConf props { title, placeholder, range } =
 
 eval ∷ ∀ m r. MonadAff (PickerEffects r) m ⇒ Query ~> DSL m
 eval = case _ of
+  UpdateTextInput key str color next → do
+    let
+      val = case color of
+        Nothing -> Left str
+        Just _ -> Right str
+    H.modify \s -> s { inputs = insert key val s.inputs }
+    eval $ ComponentUpdate (const color) next
   SetValue val next → do
     state ← H.get
     H.put $ state{ color = val }
@@ -330,11 +336,11 @@ propagate = do
       , hsv: Color.toHSVA color.next
       , rgb: Color.toRGBA color.next
       }
-  for_ (fold editing) $  \spec → mustBeMounted =<< case spec of
-    TextComponentSpec { key } →
-      H.query' cpTextComponent key (H.action $ TextInput.SetValue $ Just color.next)
+  for_ (fold editing) $  \spec → case spec of
+    TextComponentSpec { key, toString } →
+      H.modify \s -> s { inputs = insert key (Right $ toString color.next) s.inputs }
     NumberComponentSpec {key, read} →
-      H.query' cpNumComponent key (H.action $ Num.SetValue $ Just $ read colorEnv)
+      H.query' cpNumComponent key (H.action $ Num.SetValue $ Just $ read colorEnv) >>= mustBeMounted
 
 mustBeMounted ∷ ∀ s f g p o m a. Maybe a → H.HalogenM s f g p o m a
 mustBeMounted (Just x) = pure x

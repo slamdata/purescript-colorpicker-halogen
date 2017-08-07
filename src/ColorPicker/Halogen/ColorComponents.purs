@@ -29,7 +29,6 @@ import Data.Maybe (Maybe(..))
 import Math (round)
 import NumberInput.Halogen.Component as Num
 import NumberInput.Range (Range(..))
-import TextInput.Halogen.Component as TextInput
 
 
 type PreNumConf a = { prefix ∷ String, title ∷ String, placeholder ∷ String, range ∷ Range a }
@@ -48,7 +47,8 @@ data ColorComponent
     , config ∷ PreNumConf Number
     }
   | TextComponentSpec
-    { hasInputVal ∷ TextInput.HasTextInputVal Color
+    { fromString ∷ String → Maybe Color
+    , toString ∷ Color → String
     , key ∷ String
     , config ∷ PreTextConf
     }
@@ -129,10 +129,8 @@ componentBlue = NumberComponentSpec
 
 componentHEX ∷ ColorComponent
 componentHEX = TextComponentSpec
-  { hasInputVal:
-      { fromString: \str → Color.fromHexString $ "#" <> str
-      , toString: \color → String.toUpper $ String.drop 1 $ Color.toHexString color
-      }
+  { fromString: \str → Color.fromHexString $ "#" <> str
+  , toString: \color → String.toUpper $ String.drop 1 $ Color.toHexString color
   , key: "HEX"
   , config:
       { prefix: "#"

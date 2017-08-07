@@ -99,10 +99,8 @@ config2 = mkConf
 
 componentRedORNoRed ∷ C.ColorComponent
 componentRedORNoRed = C.TextComponentSpec
-  { hasInputVal:
-      { fromString: \str → if str == "red" then Just (rgb 255 0 0) else Nothing
-      , toString: \color → if color == (rgb 255 0 0) then "red" else "nored"
-      }
+  { fromString: \str → if str == "red" then Just (rgb 255 0 0) else Nothing
+  , toString: \color → if color == (rgb 255 0 0) then "red" else "nored"
   , key: "Red"
   , config:
       { title: "red or nored?"
