@@ -25,7 +25,7 @@ import Halogen.HTML.Properties as HP
 import Halogen.Query.HalogenM (halt)
 import NumberInput.Halogen.Component as Num
 import ColorPicker.Halogen.ColorComponents (ColorComponent(..), PreNumConf, PreTextConf)
-import PatternInput.Halogen.Component as PatternInput
+import TextInput.Halogen.Component as TextInput
 
 
 type State =
@@ -83,13 +83,13 @@ data Query a
   | Commit a
   | Init a
 
-type ChildQuery = Coproduct.Coproduct2 (Num.Query Number) (PatternInput.Query Color)
+type ChildQuery = Coproduct.Coproduct2 (Num.Query Number) (TextInput.Query Color)
 type Slot = Either.Either2 String String
 
 cpNumComponent ∷ CP.ChildPath (Num.Query Number) ChildQuery String Slot
 cpNumComponent = CP.cp1
 
-cpTextComponent ∷ CP.ChildPath (PatternInput.Query Color) ChildQuery String Slot
+cpTextComponent ∷ CP.ChildPath (TextInput.Query Color) ChildQuery String Slot
 cpTextComponent = CP.cp2
 
 type HTML m = H.ParentHTML Query ChildQuery Slot m
@@ -212,8 +212,8 @@ renderEditingItem props x = HH.div [ HP.classes $ props `classesFor` EditingItem
         $ HE.input \(Num.NotifyChange val) → ComponentUpdate $ \color → update <$> val >>= (_ $ color)
     TextComponentSpec { hasInputVal, key, config } →
       input config.prefix
-        $ HH.slot' cpTextComponent key (PatternInput.input hasInputVal (mkTextConfig props config)) unit
-        $ HE.input \(PatternInput.NotifyChange val) → ComponentUpdate $ const val
+        $ HH.slot' cpTextComponent key (TextInput.input hasInputVal (mkTextConfig props config)) unit
+        $ HE.input \(TextInput.NotifyChange val) → ComponentUpdate $ const val
 
   input ∷ String → HTML m → HTML m
   input label child =
@@ -222,7 +222,7 @@ renderEditingItem props x = HH.div [ HP.classes $ props `classesFor` EditingItem
       , child
       ]
 
-mkTextConfig ∷ ∀ a. Props → PreTextConf → PatternInput.Config a
+mkTextConfig ∷ Props → PreTextConf → TextInput.Config
 mkTextConfig props { title, placeholder } =
   { title
   , placeholder
@@ -316,7 +316,7 @@ propagate = do
       }
   for_ (fold editing) $  \spec → mustBeMounted =<< case spec of
     TextComponentSpec { key } →
-      H.query' cpTextComponent key (H.action $ PatternInput.SetValue $ Just colorNext)
+      H.query' cpTextComponent key (H.action $ TextInput.SetValue $ Just colorNext)
     NumberComponentSpec {key, read} →
       H.query' cpNumComponent key (H.action $ Num.SetValue $ Just $ read colorEnv)
 

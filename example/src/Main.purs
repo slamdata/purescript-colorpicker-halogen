@@ -75,7 +75,7 @@ eval (HandleMsg idx msg next) = do
   update state = insert idx val state
     where
     val = case lookup idx state, msg of
-      Just s, CPicker.NextChange next → s{next = next}
+      Just s, CPicker.NextChange nextVal → s{next = nextVal}
       _, CPicker.NextChange x → { next: x, current: x }
       _, CPicker.NotifyChange x →  {next: x, current: x}
 

@@ -29,7 +29,7 @@ import Data.Maybe (Maybe(..))
 import Math (round)
 import NumberInput.Halogen.Component as Num
 import NumberInput.Range (Range(..))
-import PatternInput.Halogen.Component as PatternInput
+import TextInput.Halogen.Component as TextInput
 
 
 type PreNumConf a = { prefix ∷ String, title ∷ String, placeholder ∷ String, range ∷ Range a }
@@ -48,7 +48,7 @@ data ColorComponent
     , config ∷ PreNumConf Number
     }
   | TextComponentSpec
-    { hasInputVal ∷ PatternInput.HasInputVal Color
+    { hasInputVal ∷ TextInput.HasTextInputVal Color
     , key ∷ String
     , config ∷ PreTextConf
     }
