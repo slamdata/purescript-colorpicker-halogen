@@ -1,6 +1,7 @@
 module ColorPicker.Halogen.Component
   ( picker
   , Query(GetValue, SetValue, Commit)
+  , ValueProgress
   , Message(..)
   , Props
   , ClassGroup(..)
@@ -39,8 +40,7 @@ import TextInput.Halogen.Component as TextInput
 
 type ValueProgress a =  { current ∷ a, next ∷ a }
 type State =
-  { colorCurrent ∷ Color
-  , colorNext ∷ Color
+  { color ∷ ValueProgress Color
   , props ∷ Props
   }
 
@@ -115,7 +115,7 @@ initialColor = Color.hsl 0.0 0.0 0.0
 
 picker ∷ ∀ m r. MonadAff (PickerEffects r) m ⇒ H.Component HH.HTML Query Props Message m
 picker = H.lifecycleParentComponent
-  { initialState: { colorCurrent: initialColor, colorNext: initialColor, props: _ }
+  { initialState: { color: { current: initialColor, next: initialColor }, props: _ }
   , render
   , eval
   , receiver: HE.input SetProps
@@ -124,18 +124,18 @@ picker = H.lifecycleParentComponent
   }
 
 render ∷ ∀ m. State → HTML m
-render { colorCurrent, colorNext, props} =
+render { color, props} =
   HH.div
     [ HP.classes $ props `classesFor` Root ]
     [ dragger, aside ]
   where
   textColor c = CSS.color if Color.isLight c then CSS.black else CSS.white
-  hsv = Color.toHSVA $ colorNext
+  hsv = Color.toHSVA $ color.next
 
   dragger =
     HH.div
       [ HP.classes $ props `classesFor` Dragger
-      , HCSS.style $ textColor colorNext
+      , HCSS.style $ textColor color.next
       ]
       [ field, slider ]
 
@@ -153,7 +153,7 @@ render { colorCurrent, colorNext, props} =
             CSS.display CSS.block
             CSS.left $ CSS.pct (hsv.s * 100.0)
             CSS.bottom $ CSS.pct (hsv.v * 100.0)
-            CSS.backgroundColor colorNext
+            CSS.backgroundColor color.next
         ]
         []
       ]
@@ -183,18 +183,18 @@ render { colorCurrent, colorNext, props} =
           [ HP.classes $ props `classesFor` ColorBlockNext
           , HP.title "Next value"
           , HCSS.style do
-              CSS.backgroundColor colorNext
-              textColor colorNext
+              CSS.backgroundColor color.next
+              textColor color.next
           ]
           []
       , HH.div
           [ HP.tabIndex 0
           , HP.classes $ props `classesFor` ColorBlockCurrent
           , HP.title "Current value"
-          , HE.onClick $ HE.input (\_ → ComponentUpdate $ const $ Just colorCurrent)
+          , HE.onClick $ HE.input (\_ → ComponentUpdate $ const $ Just color.current)
           , HCSS.style do
-              CSS.backgroundColor colorCurrent
-              textColor colorCurrent
+              CSS.backgroundColor color.current
+              textColor color.current
           ]
           []
       ]
@@ -256,20 +256,20 @@ eval ∷ ∀ m r. MonadAff (PickerEffects r) m ⇒ Query ~> DSL m
 eval = case _ of
   SetValue val next → do
     state ← H.get
-    H.put $ state{colorCurrent = val.current, colorNext = val.next}
+    H.put $ state{ color = val }
     pure next
-  GetValue next → H.get <#> (\s → { current: s.colorCurrent, next: s.colorNext })
+  GetValue next → H.get <#> (_.color >>> next)
   Init next → do
     propagate
     pure next
   Commit next → do
     state ← H.get
-    H.put $ state{colorCurrent = state.colorNext, colorNext = state.colorNext}
-    H.raise $ NotifyChange state.colorNext
+    H.put $ state{ color {current = state.color.next, next = state.color.next} }
+    H.raise $ NotifyChange state.color.next
     pure next
   ComponentUpdate update next → do
     state ← H.get
-    for_ (update state.colorNext) $ \color' → do
+    for_ (update state.color.next) $ \color' → do
       updateColor state $ color'
     pure next
   SetProps props next → do
@@ -280,7 +280,7 @@ eval = case _ of
       Drag.Move event dragData → do
         state ← H.get
         let
-          color = state.colorNext
+          color = state.color.next
           hsv = Color.toHSVA color
           s = dragData.progress.x
           v = 1.0 - dragData.progress.y
@@ -294,7 +294,7 @@ eval = case _ of
         state ← H.get
         let
           h = (1.0 - dragData.progress.y) * 360.0
-          hsl = Color.toHSLA $ state.colorNext
+          hsl = Color.toHSLA $ state.color.next
         updateColor state (Color.hsl h hsl.s hsl.l)
       Drag.Done event → pure unit
     pure next
@@ -317,22 +317,22 @@ startDrag action event next = do
 
 updateColor ∷ ∀ m. State → Color → DSL m Unit
 updateColor state colorNext = do
-  H.put state{colorNext = colorNext}
+  H.put state{ color { next = colorNext } }
   H.raise $ NextChange colorNext
   propagate
 
 propagate ∷ ∀ m. DSL m Unit
 propagate = do
-  { colorNext, props: { editing }} ← H.get
+  { color, props: { editing }} ← H.get
   let
     colorEnv =
-      { hsl: Color.toHSLA colorNext
-      , hsv: Color.toHSVA colorNext
-      , rgb: Color.toRGBA colorNext
+      { hsl: Color.toHSLA color.next
+      , hsv: Color.toHSVA color.next
+      , rgb: Color.toRGBA color.next
       }
   for_ (fold editing) $  \spec → mustBeMounted =<< case spec of
     TextComponentSpec { key } →
-      H.query' cpTextComponent key (H.action $ TextInput.SetValue $ Just colorNext)
+      H.query' cpTextComponent key (H.action $ TextInput.SetValue $ Just color.next)
     NumberComponentSpec {key, read} →
       H.query' cpNumComponent key (H.action $ Num.SetValue $ Just $ read colorEnv)
 
