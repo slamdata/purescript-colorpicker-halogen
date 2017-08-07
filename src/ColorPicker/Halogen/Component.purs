@@ -1,4 +1,14 @@
-module ColorPicker.Halogen.Component where
+module ColorPicker.Halogen.Component
+  ( picker
+  , Query(GetValue, SetValue, Commit)
+  , Message(..)
+  , Props
+  , ClassGroup(..)
+  , ColorComponentGroups
+  , ColorComponents
+  , PickerEffects
+  )
+  where
 
 import Prelude
 
@@ -14,7 +24,6 @@ import Data.Foldable (fold, for_)
 import Data.Functor.Coproduct.Nested as Coproduct
 import Data.Map (Map, lookup)
 import Data.Maybe (Maybe(..), fromMaybe)
-import Debug.Trace (spy)
 import Halogen (liftEff)
 import Halogen as H
 import Halogen.Component.ChildPath as CP
@@ -28,6 +37,7 @@ import ColorPicker.Halogen.ColorComponents (ColorComponent(..), PreNumConf, PreT
 import TextInput.Halogen.Component as TextInput
 
 
+type ValueProgress a =  { current ∷ a, next ∷ a }
 type State =
   { colorCurrent ∷ Color
   , colorNext ∷ Color
@@ -82,6 +92,8 @@ data Query a
   | ComponentUpdate (Color → Maybe Color) a
   | Commit a
   | Init a
+  | GetValue (ValueProgress Color → a)
+  | SetValue (ValueProgress Color) a
 
 type ChildQuery = Coproduct.Coproduct2 (Num.Query Number) (TextInput.Query Color)
 type Slot = Either.Either2 String String
@@ -242,13 +254,17 @@ mkNumConf props { title, placeholder, range } =
 
 eval ∷ ∀ m r. MonadAff (PickerEffects r) m ⇒ Query ~> DSL m
 eval = case _ of
+  SetValue val next → do
+    state ← H.get
+    H.put $ state{colorCurrent = val.current, colorNext = val.next}
+    pure next
+  GetValue next → H.get <#> (\s → { current: s.colorCurrent, next: s.colorNext })
   Init next → do
     propagate
     pure next
   Commit next → do
     state ← H.get
     H.put $ state{colorCurrent = state.colorNext, colorNext = state.colorNext}
-    void $ map spy H.get
     H.raise $ NotifyChange state.colorNext
     pure next
   ComponentUpdate update next → do
