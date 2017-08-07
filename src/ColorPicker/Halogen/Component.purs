@@ -24,7 +24,7 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Query.HalogenM (halt)
 import NumberInput.Halogen.Component as Num
-import PatternInput.Halogen.ColorComponents (ColorComponent(..), PreNumConf, PreTextConf)
+import ColorPicker.Halogen.ColorComponents (ColorComponent(..), PreNumConf, PreTextConf)
 import PatternInput.Halogen.Component as PatternInput
 
 

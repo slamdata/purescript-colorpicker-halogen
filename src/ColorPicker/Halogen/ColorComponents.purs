@@ -1,4 +1,4 @@
-module PatternInput.Halogen.ColorComponents
+module ColorPicker.Halogen.ColorComponents
   ( ColorComponent(..)
   , PreNumConf
   , PreTextConf

@@ -19,7 +19,7 @@ import Halogen.Component.ChildPath as CP
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.VDom.Driver (runUI)
-import PatternInput.Halogen.ColorComponents as C
+import ColorPicker.Halogen.ColorComponents as C
 
 main ∷ Eff (HA.HalogenEffects ()) Unit
 main = HA.runHalogenAff do
