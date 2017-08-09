@@ -115,7 +115,6 @@ mkConf root editing =
     [ Tuple CPicker.Root $ [ClassName "ColorPicker"] <> root
     , Tuple CPicker.Dragger [ClassName "ColorPicker-dragger"]
     , Tuple CPicker.Field [ClassName "ColorPicker-field"]
-    , Tuple CPicker.FieldGradient [ClassName "ColorPicker-fieldGradient"]
     , Tuple CPicker.FieldSelector [ClassName "ColorPicker-fieldSelector"]
     , Tuple CPicker.Slider [ClassName "ColorPicker-slider"]
     , Tuple CPicker.SliderSelector [ClassName "ColorPicker-sliderSelector"]

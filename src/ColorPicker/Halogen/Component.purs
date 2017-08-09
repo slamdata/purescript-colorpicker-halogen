@@ -59,7 +59,6 @@ data ClassGroup
   = Root
   | Dragger
   | Field
-  | FieldGradient
   | FieldSelector
   | Slider
   | SliderSelector
@@ -147,8 +146,7 @@ render state@{ color, inputs, props} =
       , HE.onMouseDown $ HE.input (Left >>> FieldDragStart)
       , HE.onTouchStart $ HE.input (Right >>> FieldDragStart)
       ]
-      [ HH.div [ HP.classes $ props `classesFor` FieldGradient] []
-      , HH.div
+      [ HH.div
         [ HP.classes $ props `classesFor` FieldSelector
         , HCSS.style do
             CSS.display CSS.block
