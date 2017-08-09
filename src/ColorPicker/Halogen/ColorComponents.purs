@@ -68,7 +68,7 @@ componentSaturationHSL ∷ ColorComponent
 componentSaturationHSL = NumberComponentSpec
   { hasNumVal: hasValRound
   , key: "SaturationHSL"
-  , update: \n color → Just $ modifyHSV (_{s = n / 100.0}) color
+  , update: \n color → Just $ modifyHSL (_{s = n / 100.0}) color
   , read: \({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * hsl.s
   , config: confSaturation
   }
@@ -77,7 +77,7 @@ componentLightness ∷ ColorComponent
 componentLightness = NumberComponentSpec
   { hasNumVal: hasValRound
   , key: "Lightness"
-  , update: \n color → Just $ modifyHSV (_{v = n / 100.0}) color
+  , update: \n color → Just $ modifyHSL (_{l = n / 100.0}) color
   , read: \({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * hsl.l
   , config: confLightness
   }
