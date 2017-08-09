@@ -75,6 +75,8 @@ data ClassGroup
   | InputElemInvalid
   | Actions
   | ActionSet
+  | IsLight
+  | IsDark
 
 derive instance classGroupEq ∷ Eq ClassGroup
 derive instance classGroupOrd ∷ Ord ClassGroup
@@ -130,14 +132,12 @@ render state@{ color, inputs, props} =
     [ HP.classes $ props `classesFor` Root ]
     [ dragger, aside ]
   where
-  textColor c = CSS.color if Color.isLight c then CSS.black else CSS.white
+  colorClasses c = props `classesFor` (if Color.isLight c then IsLight else IsDark)
   hsv = Color.toHSVA $ color.next
 
   dragger =
     HH.div
-      [ HP.classes $ props `classesFor` Dragger
-      , HCSS.style $ textColor color.next
-      ]
+      [ HP.classes $ (props `classesFor` Dragger) <> colorClasses color.next ]
       [ field, slider ]
 
   field =
@@ -181,21 +181,17 @@ render state@{ color, inputs, props} =
     HH.div
       [ HP.classes $ props `classesFor` Stage ]
       [ HH.div
-          [ HP.classes $ props `classesFor` ColorBlockNext
+          [ HP.classes $ (props `classesFor` ColorBlockNext) <> colorClasses color.next
           , HP.title "Next value"
-          , HCSS.style do
-              CSS.backgroundColor color.next
-              textColor color.next
+          , HCSS.style $ CSS.backgroundColor color.next
           ]
           []
       , HH.div
           [ HP.tabIndex 0
-          , HP.classes $ props `classesFor` ColorBlockCurrent
+          , HP.classes $ (props `classesFor` ColorBlockCurrent) <> colorClasses color.current
           , HP.title "Current value"
           , HE.onClick $ HE.input (\_ → ComponentUpdate $ const $ Just color.current)
-          , HCSS.style do
-              CSS.backgroundColor color.current
-              textColor color.current
+          , HCSS.style $ CSS.backgroundColor color.current
           ]
           []
       ]

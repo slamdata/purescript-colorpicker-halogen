@@ -155,7 +155,7 @@ nodeBoundingClientRect node = fromMaybe
   (getBoundingClientRect <$>elem)
   where
   elem ∷ Maybe HTMLElement
-  elem = fromNode $ node
+  elem = fromNode node
 
 clapInRect ∷ Position → DOMRect → Position
 clapInRect { x, y } { left, right, top, bottom } =
@@ -183,7 +183,7 @@ mkDragData
   → Eff ( dom ∷ DOM | r ) DragData
 mkDragData pos event node = do
   rect ← absoluteDomRect <$> (nodeBoundingClientRect node) <*> scrollPosition
-  let 
+  let
     pagePos = cursorEventToPosition event `clapInRect` rect
     pointer = pagePos `positionInRect` rect
     progress = pointer `progressInRect` rect

@@ -231,10 +231,10 @@ type RecordHSVA = { h ∷ Number, s ∷ Number, v ∷ Number, a ∷ Number }
 type RecordRGBA = { r ∷ Int, g ∷ Int, b ∷ Int, a ∷ Number }
 
 modifyHSL ∷ (RecordHSLA → RecordHSLA) → Color → Color
-modifyHSL f c = case f (Color.toHSLA c) of {h, s, l, a} → Color.hsla h s l a
+modifyHSL f c = let {h, s, l, a} = f (Color.toHSLA c) in Color.hsla h s l a
 
 modifyHSV ∷ (RecordHSVA → RecordHSVA) → Color → Color
-modifyHSV f c = case f (Color.toHSVA c) of {h, s, v, a} → Color.hsva h s v a
+modifyHSV f c = let {h, s, v, a} = f (Color.toHSVA c) in Color.hsva h s v a
 
 modifyRGB ∷ (RecordRGBA → RecordRGBA) → Color → Color
-modifyRGB f c = case f (Color.toRGBA c) of {r, g, b, a} → Color.rgba r g b a
+modifyRGB f c = let {r, g, b, a} = f (Color.toRGBA c) in Color.rgba r g b a

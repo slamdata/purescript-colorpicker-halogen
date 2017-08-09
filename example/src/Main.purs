@@ -131,5 +131,7 @@ mkConf root editing =
     , Tuple CPicker.InputElemInvalid [ClassName "ColorPicker-inputElem--invalid"]
     , Tuple CPicker.Actions [ClassName "ColorPicker-actions"]
     , Tuple CPicker.ActionSet [ClassName "ColorPicker-actionSet"]
+    , Tuple CPicker.IsLight [ClassName "IsLight"]
+    , Tuple CPicker.IsDark [ClassName "IsDark"]
     ]
   }
