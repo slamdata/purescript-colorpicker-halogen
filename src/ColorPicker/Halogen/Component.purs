@@ -133,14 +133,14 @@ renderLayout state@{ color, inputs, props} = case _ of
     HH.div
       [ HP.classes $ props `classesFor` Stage ]
       [ HH.div
-          [ HP.classes $ (props `classesFor` ColorBlockNext) <> colorClasses props color.next
+          [ HP.classes $ classesFor props ColorBlockNext <> colorClasses props color.next
           , HP.title "Next value"
           , HCSS.style $ CSS.backgroundColor color.next
           ]
           []
       , HH.div
           [ HP.tabIndex 0
-          , HP.classes $ (props `classesFor` ColorBlockCurrent) <> colorClasses props color.current
+          , HP.classes $ classesFor props ColorBlockCurrent <> colorClasses props color.current
           , HP.title "Current value"
           , HE.onClick $ HE.input (\_ → ComponentUpdate $ const $ Just color.current)
           , HCSS.style $ CSS.backgroundColor color.current
@@ -193,7 +193,7 @@ renderLayout state@{ color, inputs, props} = case _ of
         [ HH.span [HP.classes classes.label] [HH.text label]] <> child
 
 colorClasses ∷ Props → Color → Array HH.ClassName
-colorClasses props c = props `classesFor` (if Color.isLight c then IsLight else IsDark)
+colorClasses props c = classesFor props $ if Color.isLight c then IsLight else IsDark
 
 mkNumConf ∷ ∀ a. InputClasses → PreNumConf a → Num.Config a
 mkNumConf {elem, elemInvalid} { title, placeholder, range } =

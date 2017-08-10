@@ -119,7 +119,7 @@ mkConf
   → CPicker.Props
 mkConf reverse' root editGroups =
   { layout:
-    [ ClassName "ColorPicker", root ] `L.Group` (reverse'
+    L.Group [ ClassName "ColorPicker", root ] $ reverse'
       [ [ ClassName "ColorPicker-dragger" ] `L.Group`
           [ L.Component $ C.componentDragSV
               { root: [ ClassName "ColorPicker-field" ]
@@ -140,7 +140,7 @@ mkConf reverse' root editGroups =
                   editGroup <#> \mkItem -> L.Component $ mkItem inputClasses
           , L.Actions
           ]
-      ])
+      ]
   , classes: fromFoldable
     [ Tuple CPicker.Stage [ ClassName "ColorPicker-stage" ]
     , Tuple CPicker.ColorBlockCurrent [ ClassName "ColorPicker-colorBlockCurrent" ]
