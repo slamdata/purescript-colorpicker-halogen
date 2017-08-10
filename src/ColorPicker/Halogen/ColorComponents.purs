@@ -2,9 +2,13 @@ module ColorPicker.Halogen.ColorComponents
   ( ColorComponent(..)
   , PreNumConf
   , PreTextConf
+  , InputClasses
   , RecordHSLA
   , RecordHSVA
   , RecordRGBA
+  , StyleProps
+  , PositionUpdate
+  , ColorEnv
   , componentHue
   , componentSaturationHSL
   , componentLightness
@@ -17,46 +21,121 @@ module ColorPicker.Halogen.ColorComponents
   , componentSL
   , componentSV
   , componentRGB
+  , componentDragHue
+  , componentDragSV
   ) where
 
 import Prelude
 
+import CSS (CSS)
+import CSS as CSS
 import Color (Color)
 import Color as Color
 import Data.Int (floor, toNumber)
-import Data.String as String
 import Data.Maybe (Maybe(..))
+import Data.String as String
+import Halogen (ClassName)
 import Math (round)
 import NumberInput.Halogen.Component as Num
 import NumberInput.Range (Range(..))
 
+type PositionUpdate = { x ∷ Number, y ∷ Number } → Color → Color
+
+type StyleProps =
+  { classes ∷ Array ClassName
+  , css ∷ CSS
+  }
 
 type PreNumConf a = { prefix ∷ String, title ∷ String, placeholder ∷ String, range ∷ Range a }
+
 type PreTextConf = { prefix ∷ String, title ∷ String, placeholder ∷ String }
 
+type ColorEnv =
+  { hsl ∷ RecordHSLA
+  , hsv ∷ RecordHSVA
+  , rgb ∷ RecordRGBA
+  , isLight ∷ Boolean
+  , color ∷ Color
+  }
+
+type InputClasses =
+  { root ∷ Array ClassName
+  , label ∷ Array ClassName
+  , elem ∷ Array ClassName
+  , elemInvalid ∷ Array ClassName
+  }
+
+--TODO remove key from spec
 data ColorComponent
   = NumberComponentSpec
     { hasNumVal ∷ Num.HasNumberInputVal Number
     , update ∷ Number → Color → Maybe Color
     , key ∷ String
-    , read ∷
-      { hsl ∷ RecordHSLA
-      , hsv ∷ RecordHSVA
-      , rgb ∷ RecordRGBA
-      } → Number
+    , read ∷ ColorEnv → Number
     , config ∷ PreNumConf Number
+    , classes ∷ InputClasses
     }
   | TextComponentSpec
     { fromString ∷ String → Maybe Color
     , toString ∷ Color → String
     , key ∷ String
     , config ∷ PreTextConf
+    , classes ∷ InputClasses
+    }
+  | DragComponentSpec
+    { root ∷ ColorEnv → StyleProps
+    , selector ∷ ColorEnv → StyleProps
+    , update ∷ { x ∷ Number, y ∷ Number } → Color → Color
     }
 
 
-componentHue ∷ ColorComponent
-componentHue = NumberComponentSpec
-  { hasNumVal: hasValRound
+componentDragSV ∷
+  { isLight ∷ Array ClassName
+  , isDark ∷ Array ClassName
+  , root ∷ Array ClassName
+  , selector ∷ Array ClassName
+  }
+  → ColorComponent
+componentDragSV classes = DragComponentSpec
+  { update : \{x, y} color →
+      let hsv = Color.toHSVA color
+      in Color.hsv hsv.h x (1.0 - y)
+  , root: \{isLight, hsv} →
+    { classes: classes.root <> if isLight then classes.isLight else classes.isDark
+    , css: CSS.backgroundColor $ Color.hsl hsv.h 1.0 0.5
+    }
+  , selector: \{hsv, color} →
+    { classes: classes.selector
+    , css: do
+        CSS.left $ CSS.pct (hsv.s * 100.0)
+        CSS.bottom $ CSS.pct (hsv.v * 100.0)
+        CSS.backgroundColor color
+    }
+  }
+
+componentDragHue ∷
+  { root ∷ Array ClassName
+  , selector ∷ Array ClassName
+  }
+  → ColorComponent
+componentDragHue classes = DragComponentSpec
+  { update : \{y} color →
+      let hsl = Color.toHSLA $ color
+      in (Color.hsl ((1.0 - y) * 360.0) hsl.s hsl.l)
+  , root: \_ →
+    { classes: classes.root
+    , css: pure unit
+    }
+  , selector: \{hsv} →
+    { classes: classes.selector
+    , css: CSS.top $ CSS.pct ((1.0 - hsv.h / 360.0) * 100.0)
+    }
+  }
+
+componentHue ∷ InputClasses → ColorComponent
+componentHue classes = NumberComponentSpec
+  { classes
+  , hasNumVal: hasValRound
   , key: "Hue"
   , update: \n color → Just $ modifyHSL (_{h = n}) color
   , read: \({rgb, hsv, hsl}) → roundFractionalNum hsl.h
@@ -64,72 +143,80 @@ componentHue = NumberComponentSpec
   }
 
 
-componentSaturationHSL ∷ ColorComponent
-componentSaturationHSL = NumberComponentSpec
-  { hasNumVal: hasValRound
+componentSaturationHSL ∷ InputClasses → ColorComponent
+componentSaturationHSL classes = NumberComponentSpec
+  { classes
+  , hasNumVal: hasValRound
   , key: "SaturationHSL"
   , update: \n color → Just $ modifyHSL (_{s = n / 100.0}) color
   , read: \({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * hsl.s
   , config: confSaturation
   }
 
-componentLightness ∷ ColorComponent
-componentLightness = NumberComponentSpec
-  { hasNumVal: hasValRound
+componentLightness ∷ InputClasses → ColorComponent
+componentLightness classes = NumberComponentSpec
+  { classes
+  , hasNumVal: hasValRound
   , key: "Lightness"
   , update: \n color → Just $ modifyHSL (_{l = n / 100.0}) color
   , read: \({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * hsl.l
   , config: confLightness
   }
 
-componentSaturationHSV ∷ ColorComponent
-componentSaturationHSV = NumberComponentSpec
-  { hasNumVal: hasValRound
+componentSaturationHSV ∷ InputClasses → ColorComponent
+componentSaturationHSV classes = NumberComponentSpec
+  { classes
+  , hasNumVal: hasValRound
   , key: "SaturationHSV"
-  , update: \n color → Just $ modifyHSL (_{s = n / 100.0}) color
+  , update: \n color → Just $ modifyHSV (_{s = n / 100.0}) color
   , read: \({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * hsv.s
   , config: confSaturation
   }
 
-componentValue ∷ ColorComponent
-componentValue = NumberComponentSpec
-  { hasNumVal: hasValRound
+componentValue ∷ InputClasses → ColorComponent
+componentValue classes = NumberComponentSpec
+  { classes
+  , hasNumVal: hasValRound
   , key: "Value"
-  , update: \n color → Just $ modifyHSL (_{l = n / 100.0}) color
+  , update: \n color → Just $ modifyHSV (_{v = n / 100.0}) color
   , read: \({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * hsv.v
   , config: confValue
   }
 
-componentRed ∷ ColorComponent
-componentRed = NumberComponentSpec
-  { hasNumVal: hasvalCail
+componentRed ∷ InputClasses → ColorComponent
+componentRed classes = NumberComponentSpec
+  { classes
+  , hasNumVal: hasvalCail
   , key: "Red"
   , update: \n color → Just $ modifyRGB (_{r = asInt n}) color
   , read: \({rgb, hsv, hsl}) → roundNum $ toNumber rgb.r
   , config: confRed
   }
 
-componentGreen ∷ ColorComponent
-componentGreen = NumberComponentSpec
-  { hasNumVal: hasvalCail
+componentGreen ∷ InputClasses → ColorComponent
+componentGreen classes = NumberComponentSpec
+  { classes
+  , hasNumVal: hasvalCail
   , key: "Green"
   , update: \n color → Just $ modifyRGB (_{g = asInt n}) color
   , read: \({rgb, hsv, hsl}) → roundNum $ toNumber rgb.g
   , config: confGreen
   }
 
-componentBlue ∷ ColorComponent
-componentBlue = NumberComponentSpec
-  { hasNumVal: hasvalCail
+componentBlue ∷ InputClasses → ColorComponent
+componentBlue classes = NumberComponentSpec
+  { classes
+  , hasNumVal: hasvalCail
   , key: "Blue"
   , update: \n color → Just $ modifyRGB (_{b = asInt n}) color
   , read: \({rgb, hsv, hsl}) → roundNum $ toNumber rgb.b
   , config: confBlue
   }
 
-componentHEX ∷ ColorComponent
-componentHEX = TextComponentSpec
-  { fromString: \str → Color.fromHexString $ "#" <> str
+componentHEX ∷ InputClasses → ColorComponent
+componentHEX classes = TextComponentSpec
+  { classes
+  , fromString: \str → Color.fromHexString $ "#" <> str
   , toString: \color → String.toUpper $ String.drop 1 $ Color.toHexString color
   , key: "HEX"
   , config:
@@ -139,13 +226,13 @@ componentHEX = TextComponentSpec
       }
   }
 
-componentSL ∷ Array ColorComponent
+componentSL ∷ Array (InputClasses → ColorComponent)
 componentSL = [componentSaturationHSL, componentLightness]
 
-componentSV ∷ Array ColorComponent
+componentSV ∷ Array (InputClasses → ColorComponent)
 componentSV = [componentSaturationHSV, componentValue]
 
-componentRGB ∷ Array ColorComponent
+componentRGB ∷ Array (InputClasses → ColorComponent)
 componentRGB = [componentRed, componentGreen, componentBlue]
 
 

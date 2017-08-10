@@ -3,9 +3,12 @@ module Main where
 import Prelude
 
 import Color (Color, rgb)
+import ColorPicker.Halogen.ColorComponents as C
 import ColorPicker.Halogen.Component as CPicker
+import ColorPicker.Halogen.Layout as L
 import Control.Monad.Aff.Class (class MonadAff)
 import Control.Monad.Eff (Eff)
+import Data.Array (reverse)
 import Data.Either.Nested as Either
 import Data.Functor.Coproduct.Nested as Coproduct
 import Data.Map (Map, fromFoldable, insert, lookup)
@@ -19,7 +22,6 @@ import Halogen.Component.ChildPath as CP
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.VDom.Driver (runUI)
-import ColorPicker.Halogen.ColorComponents as C
 
 main ∷ Eff (HA.HalogenEffects ()) Unit
 main = HA.runHalogenAff do
@@ -80,26 +82,27 @@ eval (HandleMsg idx msg next) = do
       _, CPicker.NotifyChange x →  {next: x, current: x}
 
 config0 ∷ CPicker.Props
-config0 = mkConf
-  [ClassName "ColorPicker--small"]
+config0 = mkConf reverse
+  (ClassName "ColorPicker--small")
   [ [C.componentHue] <> C.componentSL
   ]
 
 config1 ∷ CPicker.Props
-config1 = mkConf
-  [ClassName "ColorPicker--large"]
-  [ [C.componentHue] <> C.componentSV <> [C.componentHEX]
-  , C.componentRGB
+config1 = mkConf id
+  (ClassName "ColorPicker--large")
+  [ [C.componentHue] <> C.componentSV <> C.componentSL
+  , C.componentRGB <> [C.componentHEX]
   ]
 
 config2 ∷ CPicker.Props
-config2 = mkConf
-  [ClassName "ColorPicker--small"]
-  [[ componentRedORNoRed ]]
+config2 = mkConf id
+  (ClassName "ColorPicker--small")
+  [ [ const componentRedORNoRed ]]
 
 componentRedORNoRed ∷ C.ColorComponent
 componentRedORNoRed = C.TextComponentSpec
-  { fromString: \str → if str == "red" then Just (rgb 255 0 0) else Nothing
+  { classes: inputClasses
+  , fromString: \str → if str == "red" then Just (rgb 255 0 0) else Nothing
   , toString: \color → if color == (rgb 255 0 0) then "red" else "nored"
   , key: "Red"
   , config:
@@ -108,29 +111,51 @@ componentRedORNoRed = C.TextComponentSpec
       , placeholder: "red"
       }
   }
-mkConf ∷ Array ClassName → CPicker.ColorComponentGroups → CPicker.Props
-mkConf root editing =
-  { editing
+
+mkConf
+  ∷ (∀ a. Array a → Array a)
+  → ClassName
+  → Array (Array (C.InputClasses → C.ColorComponent))
+  → CPicker.Props
+mkConf reverse' root editGroups =
+  { layout:
+    [ ClassName "ColorPicker", root ] `L.Group` (reverse'
+      [ [ ClassName "ColorPicker-dragger" ] `L.Group`
+          [ L.Component $ C.componentDragSV
+              { root: [ ClassName "ColorPicker-field" ]
+              , isLight: [ ClassName "IsLight" ]
+              , isDark: [ ClassName "IsDark" ]
+              , selector: [ ClassName "ColorPicker-fieldSelector"]
+              }
+          , L.Component $ C.componentDragHue
+              { root: [ ClassName "ColorPicker-slider" ]
+              , selector: [ ClassName "ColorPicker-sliderSelector"]
+              }
+          ]
+      , [ ClassName "ColorPicker-aside" ] `L.Group`
+          [ L.Stage
+          , L.Group [ ClassName "ColorPicker-editing" ] $
+              editGroups <#> \editGroup →
+                L.Group [ ClassName "ColorPicker-editingItem" ] $
+                  editGroup <#> \mkItem -> L.Component $ mkItem inputClasses
+          , L.Actions
+          ]
+      ])
   , classes: fromFoldable
-    [ Tuple CPicker.Root $ [ClassName "ColorPicker"] <> root
-    , Tuple CPicker.Dragger [ClassName "ColorPicker-dragger"]
-    , Tuple CPicker.Field [ClassName "ColorPicker-field"]
-    , Tuple CPicker.FieldSelector [ClassName "ColorPicker-fieldSelector"]
-    , Tuple CPicker.Slider [ClassName "ColorPicker-slider"]
-    , Tuple CPicker.SliderSelector [ClassName "ColorPicker-sliderSelector"]
-    , Tuple CPicker.Aside [ClassName "ColorPicker-aside"]
-    , Tuple CPicker.Stage [ClassName "ColorPicker-stage"]
-    , Tuple CPicker.ColorBlockCurrent [ClassName "ColorPicker-colorBlockCurrent"]
-    , Tuple CPicker.ColorBlockNext [ClassName "ColorPicker-colorBlockNext"]
-    , Tuple CPicker.Editing [ClassName "ColorPicker-editing"]
-    , Tuple CPicker.EditingItem [ClassName "ColorPicker-editingItem"]
-    , Tuple CPicker.Input [ClassName "ColorPicker-input"]
-    , Tuple CPicker.InputLabel [ClassName "ColorPicker-inputLabel"]
-    , Tuple CPicker.InputElem [ClassName "ColorPicker-inputElem"]
-    , Tuple CPicker.InputElemInvalid [ClassName "ColorPicker-inputElem--invalid"]
-    , Tuple CPicker.Actions [ClassName "ColorPicker-actions"]
-    , Tuple CPicker.ActionSet [ClassName "ColorPicker-actionSet"]
-    , Tuple CPicker.IsLight [ClassName "IsLight"]
-    , Tuple CPicker.IsDark [ClassName "IsDark"]
+    [ Tuple CPicker.Stage [ ClassName "ColorPicker-stage" ]
+    , Tuple CPicker.ColorBlockCurrent [ ClassName "ColorPicker-colorBlockCurrent" ]
+    , Tuple CPicker.ColorBlockNext [ ClassName "ColorPicker-colorBlockNext" ]
+    , Tuple CPicker.Actions [ ClassName "ColorPicker-actions" ]
+    , Tuple CPicker.ActionSet [ ClassName "ColorPicker-actionSet" ]
+    , Tuple CPicker.IsLight [ ClassName "IsLight" ]
+    , Tuple CPicker.IsDark [ ClassName "IsDark" ]
     ]
+  }
+
+inputClasses ∷ C.InputClasses
+inputClasses =
+  { root: [ClassName "ColorPicker-input"]
+  , label: [ClassName "ColorPicker-inputLabel"]
+  , elem: [ClassName "ColorPicker-inputElem"]
+  , elemInvalid: [ClassName "ColorPicker-inputElem--invalid"]
   }
