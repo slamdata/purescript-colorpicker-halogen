@@ -103,7 +103,7 @@ componentRedORNoRed ∷ C.ColorComponent
 componentRedORNoRed = C.TextComponentSpec
   { classes: inputClasses
   , fromString: \str → if str == "red" then Just (rgb 255 0 0) else Nothing
-  , toString: \color → if color == (rgb 255 0 0) then "red" else "nored"
+  , toString: \{color} → if color == (rgb 255 0 0) then "red" else "nored"
   , key: "Red"
   , config:
       { title: "red or nored?"
@@ -115,7 +115,7 @@ componentRedORNoRed = C.TextComponentSpec
 mkConf
   ∷ (∀ a. Array a → Array a)
   → ClassName
-  → Array (Array (C.InputClasses → C.ColorComponent))
+  → Array (Array (C.InputProps C.Classes → C.ColorComponent))
   → CPicker.Props
 mkConf reverse' root editGroups =
   { layout:
@@ -152,7 +152,7 @@ mkConf reverse' root editGroups =
     ]
   }
 
-inputClasses ∷ C.InputClasses
+inputClasses ∷ C.InputProps C.Classes
 inputClasses =
   { root: [ClassName "ColorPicker-input"]
   , label: [ClassName "ColorPicker-inputLabel"]

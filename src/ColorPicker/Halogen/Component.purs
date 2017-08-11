@@ -16,7 +16,7 @@ import Prelude
 import CSS as CSS
 import Color (Color)
 import Color as Color
-import ColorPicker.Halogen.ColorComponents (ColorComponent(..), ColorEnv, PositionUpdate, PreNumConf, InputClasses)
+import ColorPicker.Halogen.ColorComponents (ColorComponent(..), ColorEnv, PositionUpdate, PreNumConf, InputProps, Classes)
 import ColorPicker.Halogen.Layout as L
 import ColorPicker.Halogen.Utils.Drag as Drag
 import Control.Monad.Aff.Class (class MonadAff)
@@ -175,7 +175,7 @@ renderLayout state@{ color, inputs, props} = case _ of
       input classes config.prefix
         $ pure
         $ HH.slot' cpNumComponent key (Num.input hasNumVal (mkNumConf classes config)) unit
-        $ HE.input \(Num.NotifyChange val) → ComponentUpdate $ \color → update <$> val >>= (_ $ color)
+        $ HE.input \(Num.NotifyChange val) → ComponentUpdate $ \color → update <$> val >>= (_ $ colorEnv)
     TextComponentSpec { classes, fromString, key, config } →
       input classes config.prefix $ flip foldMap (lookup key inputs) \val → pure $ HH.input
         [ HP.type_ HP.InputText
@@ -195,7 +195,7 @@ renderLayout state@{ color, inputs, props} = case _ of
 colorClasses ∷ Props → Color → Array HH.ClassName
 colorClasses props c = classesFor props $ if Color.isLight c then IsLight else IsDark
 
-mkNumConf ∷ ∀ a. InputClasses → PreNumConf a → Num.Config a
+mkNumConf ∷ InputProps Classes → PreNumConf → Num.Config Number
 mkNumConf {elem, elemInvalid} { title, placeholder, range } =
   { title
   , placeholder
@@ -239,7 +239,7 @@ eval = case _ of
     case drag of
       Drag.Move event dragData → do
         state ← H.get
-        updateColor state $ update dragData.progress state.color.next
+        updateColor state $ update dragData.progress (calcColorEnv state.color.next)
         pure unit
       Drag.Done event → pure unit
     pure next
@@ -274,6 +274,7 @@ propagate = do
     (calcColorEnv color.next)
     layout
   where
+  -- TODO at this point `color` arg can be removed
   propagateLayout ∷ ValueProgress Color → ColorEnv → L.Layout → DSL m Unit
   propagateLayout color colorEnv = case _ of
     L.Group _ l → for_ l (propagateLayout color colorEnv)
@@ -282,7 +283,7 @@ propagate = do
     L.Component c → case c of
       DragComponentSpec _ → pure unit
       TextComponentSpec { key, toString } →
-        H.modify \s → s { inputs = insert key (Right $ toString color.next) s.inputs }
+        H.modify \s → s { inputs = insert key (Right $ toString colorEnv) s.inputs }
       NumberComponentSpec {key, read} →
         H.query' cpNumComponent key (H.action $ Num.SetValue $ Just $ read colorEnv) >>= mustBeMounted
 

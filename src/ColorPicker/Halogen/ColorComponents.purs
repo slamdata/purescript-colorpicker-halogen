@@ -1,12 +1,14 @@
 module ColorPicker.Halogen.ColorComponents
   ( ColorComponent(..)
+  , Dynamic
+  , Styles
   , PreNumConf
   , PreTextConf
-  , InputClasses
+  , InputProps
+  , Classes
   , RecordHSLA
   , RecordHSVA
   , RecordRGBA
-  , StyleProps
   , PositionUpdate
   , ColorEnv
   , componentHue
@@ -39,14 +41,18 @@ import Math (round)
 import NumberInput.Halogen.Component as Num
 import NumberInput.Range (Range(..))
 
-type PositionUpdate = { x ∷ Number, y ∷ Number } → Color → Color
+type PositionUpdate = { x ∷ Number, y ∷ Number } → Dynamic Color
 
-type StyleProps =
-  { classes ∷ Array ClassName
+type Dynamic s = ColorEnv → s
+
+type Classes = Array ClassName
+
+type Styles =
+  { classes ∷ Classes
   , css ∷ CSS
   }
 
-type PreNumConf a = { prefix ∷ String, title ∷ String, placeholder ∷ String, range ∷ Range a }
+type PreNumConf = { prefix ∷ String, title ∷ String, placeholder ∷ String, range ∷ Range Number }
 
 type PreTextConf = { prefix ∷ String, title ∷ String, placeholder ∷ String }
 
@@ -58,34 +64,35 @@ type ColorEnv =
   , color ∷ Color
   }
 
-type InputClasses =
-  { root ∷ Array ClassName
-  , label ∷ Array ClassName
-  , elem ∷ Array ClassName
-  , elemInvalid ∷ Array ClassName
+type InputProps c =
+  { root ∷ c
+  , label ∷ c
+  , elem ∷ c
+  , elemInvalid ∷ c
   }
+
 
 --TODO remove key from spec
 data ColorComponent
   = NumberComponentSpec
     { hasNumVal ∷ Num.HasNumberInputVal Number
-    , update ∷ Number → Color → Maybe Color
+    , update ∷ Number → Dynamic (Maybe Color)
     , key ∷ String
-    , read ∷ ColorEnv → Number
-    , config ∷ PreNumConf Number
-    , classes ∷ InputClasses
+    , read ∷ Dynamic Number
+    , config ∷ PreNumConf
+    , classes ∷ InputProps Classes
     }
   | TextComponentSpec
     { fromString ∷ String → Maybe Color
-    , toString ∷ Color → String
+    , toString ∷ Dynamic String
     , key ∷ String
     , config ∷ PreTextConf
-    , classes ∷ InputClasses
+    , classes ∷ InputProps Classes
     }
   | DragComponentSpec
-    { root ∷ ColorEnv → StyleProps
-    , selector ∷ ColorEnv → StyleProps
-    , update ∷ { x ∷ Number, y ∷ Number } → Color → Color
+    { root ∷ Dynamic Styles
+    , selector ∷ Dynamic Styles
+    , update ∷ PositionUpdate
     }
 
 
@@ -97,7 +104,7 @@ componentDragSV ∷
   }
   → ColorComponent
 componentDragSV classes = DragComponentSpec
-  { update : \{x, y} color →
+  { update : \{x, y} {color} →
       let hsv = Color.toHSVA color
       in Color.hsv hsv.h x (1.0 - y)
   , root: \{isLight, hsv} →
@@ -119,7 +126,7 @@ componentDragHue ∷
   }
   → ColorComponent
 componentDragHue classes = DragComponentSpec
-  { update : \{y} color →
+  { update : \{y} {color} →
       let hsl = Color.toHSLA $ color
       in (Color.hsl ((1.0 - y) * 360.0) hsl.s hsl.l)
   , root: \_ →
@@ -132,92 +139,92 @@ componentDragHue classes = DragComponentSpec
     }
   }
 
-componentHue ∷ InputClasses → ColorComponent
+componentHue ∷ InputProps Classes → ColorComponent
 componentHue classes = NumberComponentSpec
   { classes
   , hasNumVal: hasValRound
   , key: "Hue"
-  , update: \n color → Just $ modifyHSL (_{h = n}) color
+  , update: \n {color} → Just $ modifyHSL (_{h = n}) color
   , read: \({rgb, hsv, hsl}) → roundFractionalNum hsl.h
   , config: confHue
   }
 
 
-componentSaturationHSL ∷ InputClasses → ColorComponent
+componentSaturationHSL ∷ InputProps Classes → ColorComponent
 componentSaturationHSL classes = NumberComponentSpec
   { classes
   , hasNumVal: hasValRound
   , key: "SaturationHSL"
-  , update: \n color → Just $ modifyHSL (_{s = n / 100.0}) color
+  , update: \n {color} → Just $ modifyHSL (_{s = n / 100.0}) color
   , read: \({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * hsl.s
   , config: confSaturation
   }
 
-componentLightness ∷ InputClasses → ColorComponent
+componentLightness ∷ InputProps Classes → ColorComponent
 componentLightness classes = NumberComponentSpec
   { classes
   , hasNumVal: hasValRound
   , key: "Lightness"
-  , update: \n color → Just $ modifyHSL (_{l = n / 100.0}) color
+  , update: \n {color} → Just $ modifyHSL (_{l = n / 100.0}) color
   , read: \({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * hsl.l
   , config: confLightness
   }
 
-componentSaturationHSV ∷ InputClasses → ColorComponent
+componentSaturationHSV ∷ InputProps Classes → ColorComponent
 componentSaturationHSV classes = NumberComponentSpec
   { classes
   , hasNumVal: hasValRound
   , key: "SaturationHSV"
-  , update: \n color → Just $ modifyHSV (_{s = n / 100.0}) color
+  , update: \n {color} → Just $ modifyHSV (_{s = n / 100.0}) color
   , read: \({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * hsv.s
   , config: confSaturation
   }
 
-componentValue ∷ InputClasses → ColorComponent
+componentValue ∷ InputProps Classes → ColorComponent
 componentValue classes = NumberComponentSpec
   { classes
   , hasNumVal: hasValRound
   , key: "Value"
-  , update: \n color → Just $ modifyHSV (_{v = n / 100.0}) color
+  , update: \n {color} → Just $ modifyHSV (_{v = n / 100.0}) color
   , read: \({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * hsv.v
   , config: confValue
   }
 
-componentRed ∷ InputClasses → ColorComponent
+componentRed ∷ InputProps Classes → ColorComponent
 componentRed classes = NumberComponentSpec
   { classes
-  , hasNumVal: hasvalCail
+  , hasNumVal: hasValCail
   , key: "Red"
-  , update: \n color → Just $ modifyRGB (_{r = asInt n}) color
+  , update: \n {color} → Just $ modifyRGB (_{r = asInt n}) color
   , read: \({rgb, hsv, hsl}) → roundNum $ toNumber rgb.r
   , config: confRed
   }
 
-componentGreen ∷ InputClasses → ColorComponent
+componentGreen ∷ InputProps Classes → ColorComponent
 componentGreen classes = NumberComponentSpec
   { classes
-  , hasNumVal: hasvalCail
+  , hasNumVal: hasValCail
   , key: "Green"
-  , update: \n color → Just $ modifyRGB (_{g = asInt n}) color
+  , update: \n {color} → Just $ modifyRGB (_{g = asInt n}) color
   , read: \({rgb, hsv, hsl}) → roundNum $ toNumber rgb.g
   , config: confGreen
   }
 
-componentBlue ∷ InputClasses → ColorComponent
+componentBlue ∷ InputProps Classes → ColorComponent
 componentBlue classes = NumberComponentSpec
   { classes
-  , hasNumVal: hasvalCail
+  , hasNumVal: hasValCail
   , key: "Blue"
-  , update: \n color → Just $ modifyRGB (_{b = asInt n}) color
+  , update: \n {color} → Just $ modifyRGB (_{b = asInt n}) color
   , read: \({rgb, hsv, hsl}) → roundNum $ toNumber rgb.b
   , config: confBlue
   }
 
-componentHEX ∷ InputClasses → ColorComponent
+componentHEX ∷ InputProps Classes → ColorComponent
 componentHEX classes = TextComponentSpec
   { classes
   , fromString: \str → Color.fromHexString $ "#" <> str
-  , toString: \color → String.toUpper $ String.drop 1 $ Color.toHexString color
+  , toString: \{color} → String.toUpper $ String.drop 1 $ Color.toHexString color
   , key: "HEX"
   , config:
       { prefix: "#"
@@ -226,20 +233,20 @@ componentHEX classes = TextComponentSpec
       }
   }
 
-componentSL ∷ Array (InputClasses → ColorComponent)
+componentSL ∷ Array (InputProps Classes → ColorComponent)
 componentSL = [componentSaturationHSL, componentLightness]
 
-componentSV ∷ Array (InputClasses → ColorComponent)
+componentSV ∷ Array (InputProps Classes → ColorComponent)
 componentSV = [componentSaturationHSV, componentValue]
 
-componentRGB ∷ Array (InputClasses → ColorComponent)
+componentRGB ∷ Array (InputProps Classes → ColorComponent)
 componentRGB = [componentRed, componentGreen, componentBlue]
 
 
 -- Internal helpers
 
 
-confRed ∷ PreNumConf Number
+confRed ∷ PreNumConf
 confRed =
   { title: "Red"
   , placeholder: "R"
@@ -247,7 +254,7 @@ confRed =
   , range: MinMax 0.0 256.0
   }
 
-confGreen ∷ PreNumConf Number
+confGreen ∷ PreNumConf
 confGreen =
   { title: "Green"
   , placeholder: "G"
@@ -255,7 +262,7 @@ confGreen =
   , range: MinMax 0.0 256.0
   }
 
-confBlue ∷ PreNumConf Number
+confBlue ∷ PreNumConf
 confBlue =
   { title: "Blue"
   , placeholder: "B"
@@ -263,21 +270,21 @@ confBlue =
   , range: MinMax 0.0 256.0
   }
 
-confHue ∷ PreNumConf Number
+confHue ∷ PreNumConf
 confHue =
   { title: "Hue"
   , placeholder: "H"
   , prefix: "H"
   , range: MinMax 0.0 360.0
   }
-confSaturation ∷ PreNumConf Number
+confSaturation ∷ PreNumConf
 confSaturation =
   { title: "Saturation"
   , placeholder: "S"
   , prefix: "S"
   , range: MinMax 0.0 100.0
   }
-confLightness ∷ PreNumConf Number
+confLightness ∷ PreNumConf
 confLightness =
   { title: "Lightness"
   , placeholder: "L"
@@ -285,7 +292,7 @@ confLightness =
   , range: MinMax 0.0 100.0
   }
 
-confValue ∷ PreNumConf Number
+confValue ∷ PreNumConf
 confValue =
   { title: "Value"
   , placeholder: "V"
@@ -294,21 +301,21 @@ confValue =
   }
 
 
-asInt ∷ Number → Int
-asInt = floor
-
 hasValRound ∷ Num.HasNumberInputVal Number
 hasValRound = Num.numberHasNumberInputVal
   {fromString = Num.numberHasNumberInputVal.fromString >>> map roundFractionalNum}
 
-hasvalCail ∷ Num.HasNumberInputVal Number
-hasvalCail = Num.numberHasNumberInputVal
+hasValCail ∷ Num.HasNumberInputVal Number
+hasValCail = Num.numberHasNumberInputVal
   {fromString = Num.numberHasNumberInputVal.fromString >>> map roundNum}
 
 roundFractionalNum ∷ Number → Number
 roundFractionalNum n = roundNum (n * scalar) / scalar
   where
   scalar = 100.0
+
+asInt ∷ Number → Int
+asInt = floor
 
 roundNum ∷ Number → Number
 roundNum = round
