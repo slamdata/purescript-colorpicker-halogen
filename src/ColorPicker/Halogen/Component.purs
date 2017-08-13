@@ -16,19 +16,22 @@ import Prelude
 import CSS as CSS
 import Color (Color)
 import Color as Color
-import ColorPicker.Halogen.ColorComponents (ColorComponent(..), ColorEnv, PositionUpdate, PreNumConf, InputProps, Classes)
+import ColorPicker.Halogen.ColorComponents (ColorComponent(..), ColorEnv, PositionUpdate, mapInputProps)
 import ColorPicker.Halogen.Layout as L
 import ColorPicker.Halogen.Utils.Drag as Drag
 import Control.Monad.Aff.Class (class MonadAff)
 import Control.MonadZero (guard)
 import DOM.Classy.Event (preventDefault)
+import Data.Array (index, mapWithIndex)
 import Data.Either (Either(..), either, isLeft)
 import Data.Either.Nested as Either
-import Data.Foldable (foldMap, for_)
+import Data.Foldable (foldMap, foldr, for_)
 import Data.Functor.Coproduct.Nested as Coproduct
+import Data.List as List
 import Data.Map (Map, insert, lookup)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Monoid (mempty)
+import Data.Traversable (sequence)
 import Halogen (liftEff)
 import Halogen as H
 import Halogen.Component.ChildPath as CP
@@ -43,7 +46,7 @@ import NumberInput.Halogen.Component as Num
 type ValueProgress a =  { current ∷ a, next ∷ a }
 type State =
   { color ∷ ValueProgress Color
-  , inputs ∷ Map String (Either String String)
+  , inputs ∷ Map Cursor (Either String String)
   , props ∷ Props
   }
 
@@ -78,17 +81,19 @@ data Query a
   = SetProps Props a
   | DragStart PositionUpdate Drag.CursorEvent a
   | DragMove PositionUpdate Drag.DragEvent a
+  -- TODO `ComponentUpdate` could be removed at some point
   | ComponentUpdate (Color → Maybe Color) a
+  | NumberComponentUpdate Cursor (Maybe Number) a
+  | TextComponentUpdate Cursor String a
   | Commit a
   | Init a
   | GetValue (ValueProgress Color → a)
   | SetValue (ValueProgress Color) a
-  | UpdateTextInput String String (Maybe Color) a
 
 type ChildQuery = Coproduct.Coproduct1 (Num.Query Number)
-type Slot = Either.Either1 String
+type Slot = Either.Either1 Cursor
 
-cpNumComponent ∷ CP.ChildPath (Num.Query Number) ChildQuery String Slot
+cpNumComponent ∷ CP.ChildPath (Num.Query Number) ChildQuery Cursor Slot
 cpNumComponent = CP.cp1
 
 
@@ -112,14 +117,15 @@ picker = H.lifecycleParentComponent
   }
 
 render ∷ ∀ m. State → HTML m
-render state@{ color, inputs, props} = renderLayout state props.layout
+render state@{ color, inputs, props} = renderLayout state List.Nil props.layout
 
-renderLayout ∷ ∀ m. State → L.Layout → HTML m
-renderLayout state@{ color, inputs, props} = case _ of
+
+renderLayout ∷ ∀ m. State → Cursor → L.Layout → HTML m
+renderLayout state@{ color, inputs, props} cursor = case _ of
   L.Group classes l →
     HH.div
       [ HP.classes classes ]
-      $ map (renderLayout state) l
+      $ mapWithIndex (\idx → renderLayout state (List.Cons idx cursor)) l
   L.Actions →
     HH.div
       [ HP.classes $ props `classesFor` Actions ]
@@ -147,13 +153,13 @@ renderLayout state@{ color, inputs, props} = case _ of
           ]
           []
       ]
-  L.Component c → renderColorComponent state c
+  L.Component c → renderColorComponent state cursor c
 
   where
   hsv = Color.toHSVA $ color.next
   colorEnv = calcColorEnv color.next
-  renderColorComponent ∷ State → ColorComponent → HTML m
-  renderColorComponent { inputs, props } = case _ of
+  renderColorComponent ∷ State → Cursor → ColorComponent → HTML m
+  renderColorComponent { inputs, props } cursor = case _ of
     DragComponentSpec spec →
       let
         root = spec.root colorEnv
@@ -171,49 +177,66 @@ renderLayout state@{ color, inputs, props} = case _ of
             ]
             []
           ]
-    NumberComponentSpec { classes, key, hasNumVal, update, config } →
-      input classes config.prefix
+    NumberComponentSpec { styles, hasNumVal, update, config } → let computedStyles = mapInputProps (_ $ colorEnv) styles in
+      input computedStyles config.prefix
         $ pure
-        $ HH.slot' cpNumComponent key (Num.input hasNumVal (mkNumConf classes config)) unit
-        $ HE.input \(Num.NotifyChange val) → ComponentUpdate $ \color → update <$> val >>= (_ $ colorEnv)
-    TextComponentSpec { classes, fromString, key, config } →
-      input classes config.prefix $ flip foldMap (lookup key inputs) \val → pure $ HH.input
+        $ HH.slot'
+          cpNumComponent
+          cursor
+          Num.input
+          { title: config.title
+          , hasNumberValue: hasNumVal
+          , placeholder: config.placeholder
+          , range: config.range
+          , root: computedStyles.elem.classes
+          , rootInvalid: computedStyles.elemInvalid.classes
+          , rootLength: const []
+          }
+        $ HE.input \(Num.NotifyChange val) → NumberComponentUpdate cursor val
+    TextComponentSpec { styles, fromString, config } → let computedStyles = mapInputProps (_ $ colorEnv) styles in
+      input computedStyles config.prefix
+        $ flip foldMap (lookup cursor inputs) \val → pure
+        $ HH.input
         [ HP.type_ HP.InputText
         , HP.classes
-          $  classes.elem
-          <> (guard (isLeft val) *> (classes.elemInvalid))
+          $  computedStyles.elem.classes
+          <> (guard (isLeft val) *> (computedStyles.elemInvalid.classes))
         , HP.title config.title
         , HP.placeholder config.placeholder
         , HP.value $ either id id val
-        , HE.onValueInput $ HE.input $ \ str → UpdateTextInput key str (fromString str)
+        , HE.onValueInput $ HE.input $ TextComponentUpdate cursor
         ]
     where
-    input classes label child =
-      HH.label [HP.classes classes.root] $
-        [ HH.span [HP.classes classes.label] [HH.text label]] <> child
+    input styles label child =
+      HH.label [HP.classes styles.root.classes] $
+        [ HH.span [HP.classes styles.label.classes] [HH.text label]] <> child
 
 colorClasses ∷ Props → Color → Array HH.ClassName
 colorClasses props c = classesFor props $ if Color.isLight c then IsLight else IsDark
 
-mkNumConf ∷ InputProps Classes → PreNumConf → Num.Config Number
-mkNumConf {elem, elemInvalid} { title, placeholder, range } =
-  { title
-  , placeholder
-  , range
-  , root: elem
-  , rootInvalid: elemInvalid
-  , rootLength: const []
-  }
 
 eval ∷ ∀ m r. MonadAff (PickerEffects r) m ⇒ Query ~> DSL m
 eval = case _ of
-  UpdateTextInput key str color next → do
-    let
-      val = case color of
-        Nothing → Left str
-        Just _ → Right str
-    H.modify \s → s { inputs = insert key val s.inputs }
-    eval $ ComponentUpdate (const color) next
+  TextComponentUpdate cursor str next → do
+    {props} ← H.get
+    case focus cursor props.layout of
+      Just (L.Component (TextComponentSpec { fromString })) → do
+        let
+          color = fromString str
+          val = case color of
+            Nothing → Left str
+            Just _ → Right str
+        H.modify \s → s { inputs = insert cursor val s.inputs }
+        eval $ ComponentUpdate (const color) next
+      _ → pure next
+  NumberComponentUpdate cursor num next → do
+    { color, props } ← H.get
+    case focus cursor props.layout of
+      Just (L.Component (NumberComponentSpec { update })) → eval $
+       ComponentUpdate
+        (\_ → update <$> num >>= (_ $ calcColorEnv color.next))
+        next
+      _ → pure next
   SetValue val next → do
     state ← H.get
     H.put $ state{ color = val }
@@ -272,21 +295,31 @@ propagate = do
   propagateLayout
     color
     (calcColorEnv color.next)
+    List.Nil
     layout
   where
   -- TODO at this point `color` arg can be removed
-  propagateLayout ∷ ValueProgress Color → ColorEnv → L.Layout → DSL m Unit
-  propagateLayout color colorEnv = case _ of
-    L.Group _ l → for_ l (propagateLayout color colorEnv)
+  propagateLayout ∷ ValueProgress Color → ColorEnv → Cursor → L.Layout → DSL m Unit
+  propagateLayout color colorEnv cursor = case _ of
+    L.Group _ l → void $ sequence $ mapWithIndex (\idx → propagateLayout color colorEnv (List.Cons idx cursor)) l
     L.Stage → pure unit
     L.Actions → pure unit
     L.Component c → case c of
       DragComponentSpec _ → pure unit
-      TextComponentSpec { key, toString } →
-        H.modify \s → s { inputs = insert key (Right $ toString colorEnv) s.inputs }
-      NumberComponentSpec {key, read} →
-        H.query' cpNumComponent key (H.action $ Num.SetValue $ Just $ read colorEnv) >>= mustBeMounted
+      TextComponentSpec { toString } →
+        H.modify \s → s { inputs = insert cursor (Right $ toString colorEnv) s.inputs }
+      NumberComponentSpec { read} →
+        H.query' cpNumComponent cursor (H.action $ Num.SetValue $ Just $ read colorEnv) >>= mustBeMounted
 
 mustBeMounted ∷ ∀ s f g p o m a. Maybe a → H.HalogenM s f g p o m a
 mustBeMounted (Just x) = pure x
 mustBeMounted _ = halt "children must be mounted"
+
+type Cursor = List.List Int
+
+focus :: Cursor → L.Layout → Maybe L.Layout
+focus cursor layout = foldr f (Just layout) cursor
+  where
+  f idx = case _ of
+    Just (L.Group _ l) → index l idx
+    _ → Nothing

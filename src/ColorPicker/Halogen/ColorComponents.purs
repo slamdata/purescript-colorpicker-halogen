@@ -25,6 +25,8 @@ module ColorPicker.Halogen.ColorComponents
   , componentRGB
   , componentDragHue
   , componentDragSV
+  , mapInputProps
+  , toDynamicStyles
   ) where
 
 import Prelude
@@ -72,22 +74,19 @@ type InputProps c =
   }
 
 
---TODO remove key from spec
 data ColorComponent
   = NumberComponentSpec
-    { hasNumVal ∷ Num.HasNumberInputVal Number
+    { hasNumVal ∷ Num.HasNumberInputValue Number
     , update ∷ Number → Dynamic (Maybe Color)
-    , key ∷ String
     , read ∷ Dynamic Number
     , config ∷ PreNumConf
-    , classes ∷ InputProps Classes
+    , styles ∷ InputProps (Dynamic Styles)
     }
   | TextComponentSpec
     { fromString ∷ String → Maybe Color
     , toString ∷ Dynamic String
-    , key ∷ String
     , config ∷ PreTextConf
-    , classes ∷ InputProps Classes
+    , styles ∷ InputProps (Dynamic Styles)
     }
   | DragComponentSpec
     { root ∷ Dynamic Styles
@@ -141,9 +140,8 @@ componentDragHue classes = DragComponentSpec
 
 componentHue ∷ InputProps Classes → ColorComponent
 componentHue classes = NumberComponentSpec
-  { classes
+  { styles: toDynamicStyles classes
   , hasNumVal: hasValRound
-  , key: "Hue"
   , update: \n {color} → Just $ modifyHSL (_{h = n}) color
   , read: \({rgb, hsv, hsl}) → roundFractionalNum hsl.h
   , config: confHue
@@ -152,9 +150,8 @@ componentHue classes = NumberComponentSpec
 
 componentSaturationHSL ∷ InputProps Classes → ColorComponent
 componentSaturationHSL classes = NumberComponentSpec
-  { classes
+  { styles: toDynamicStyles classes
   , hasNumVal: hasValRound
-  , key: "SaturationHSL"
   , update: \n {color} → Just $ modifyHSL (_{s = n / 100.0}) color
   , read: \({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * hsl.s
   , config: confSaturation
@@ -162,9 +159,8 @@ componentSaturationHSL classes = NumberComponentSpec
 
 componentLightness ∷ InputProps Classes → ColorComponent
 componentLightness classes = NumberComponentSpec
-  { classes
+  { styles: toDynamicStyles classes
   , hasNumVal: hasValRound
-  , key: "Lightness"
   , update: \n {color} → Just $ modifyHSL (_{l = n / 100.0}) color
   , read: \({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * hsl.l
   , config: confLightness
@@ -172,19 +168,28 @@ componentLightness classes = NumberComponentSpec
 
 componentSaturationHSV ∷ InputProps Classes → ColorComponent
 componentSaturationHSV classes = NumberComponentSpec
-  { classes
+  { styles: toDynamicStyles classes
   , hasNumVal: hasValRound
-  , key: "SaturationHSV"
   , update: \n {color} → Just $ modifyHSV (_{s = n / 100.0}) color
   , read: \({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * hsv.s
   , config: confSaturation
   }
 
+mapInputProps :: ∀ a b. (a -> b) -> InputProps a -> InputProps b
+mapInputProps f { root, label, elem, elemInvalid } =
+  { root: f root
+  , label: f label
+  , elem: f elem
+  , elemInvalid: f elemInvalid
+  }
+
+toDynamicStyles :: InputProps Classes -> InputProps (Dynamic Styles)
+toDynamicStyles = mapInputProps $ { classes: _, css: pure unit } >>> const
+
 componentValue ∷ InputProps Classes → ColorComponent
 componentValue classes = NumberComponentSpec
-  { classes
+  { styles: toDynamicStyles classes
   , hasNumVal: hasValRound
-  , key: "Value"
   , update: \n {color} → Just $ modifyHSV (_{v = n / 100.0}) color
   , read: \({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * hsv.v
   , config: confValue
@@ -192,9 +197,8 @@ componentValue classes = NumberComponentSpec
 
 componentRed ∷ InputProps Classes → ColorComponent
 componentRed classes = NumberComponentSpec
-  { classes
+  { styles: toDynamicStyles classes
   , hasNumVal: hasValCail
-  , key: "Red"
   , update: \n {color} → Just $ modifyRGB (_{r = asInt n}) color
   , read: \({rgb, hsv, hsl}) → roundNum $ toNumber rgb.r
   , config: confRed
@@ -202,9 +206,8 @@ componentRed classes = NumberComponentSpec
 
 componentGreen ∷ InputProps Classes → ColorComponent
 componentGreen classes = NumberComponentSpec
-  { classes
+  { styles: toDynamicStyles classes
   , hasNumVal: hasValCail
-  , key: "Green"
   , update: \n {color} → Just $ modifyRGB (_{g = asInt n}) color
   , read: \({rgb, hsv, hsl}) → roundNum $ toNumber rgb.g
   , config: confGreen
@@ -212,9 +215,8 @@ componentGreen classes = NumberComponentSpec
 
 componentBlue ∷ InputProps Classes → ColorComponent
 componentBlue classes = NumberComponentSpec
-  { classes
+  { styles: toDynamicStyles classes
   , hasNumVal: hasValCail
-  , key: "Blue"
   , update: \n {color} → Just $ modifyRGB (_{b = asInt n}) color
   , read: \({rgb, hsv, hsl}) → roundNum $ toNumber rgb.b
   , config: confBlue
@@ -222,10 +224,9 @@ componentBlue classes = NumberComponentSpec
 
 componentHEX ∷ InputProps Classes → ColorComponent
 componentHEX classes = TextComponentSpec
-  { classes
+  { styles: toDynamicStyles classes
   , fromString: \str → Color.fromHexString $ "#" <> str
   , toString: \{color} → String.toUpper $ String.drop 1 $ Color.toHexString color
-  , key: "HEX"
   , config:
       { prefix: "#"
       , title: "Hex"
@@ -301,13 +302,13 @@ confValue =
   }
 
 
-hasValRound ∷ Num.HasNumberInputVal Number
-hasValRound = Num.numberHasNumberInputVal
-  {fromString = Num.numberHasNumberInputVal.fromString >>> map roundFractionalNum}
+hasValRound ∷ Num.HasNumberInputValue Number
+hasValRound = Num.numberHasNumberInputValue
+  {fromString = Num.numberHasNumberInputValue.fromString >>> map roundFractionalNum}
 
-hasValCail ∷ Num.HasNumberInputVal Number
-hasValCail = Num.numberHasNumberInputVal
-  {fromString = Num.numberHasNumberInputVal.fromString >>> map roundNum}
+hasValCail ∷ Num.HasNumberInputValue Number
+hasValCail = Num.numberHasNumberInputValue
+  {fromString = Num.numberHasNumberInputValue.fromString >>> map roundNum}
 
 roundFractionalNum ∷ Number → Number
 roundFractionalNum n = roundNum (n * scalar) / scalar

@@ -3,6 +3,7 @@ module Main where
 import Prelude
 
 import Color (Color, rgb)
+import ColorPicker.Halogen.ColorComponents (toDynamicStyles)
 import ColorPicker.Halogen.ColorComponents as C
 import ColorPicker.Halogen.Component as CPicker
 import ColorPicker.Halogen.Layout as L
@@ -101,10 +102,9 @@ config2 = mkConf id
 
 componentRedORNoRed ∷ C.ColorComponent
 componentRedORNoRed = C.TextComponentSpec
-  { classes: inputClasses
+  { styles: toDynamicStyles inputClasses
   , fromString: \str → if str == "red" then Just (rgb 255 0 0) else Nothing
   , toString: \{color} → if color == (rgb 255 0 0) then "red" else "nored"
-  , key: "Red"
   , config:
       { title: "red or nored?"
       , prefix: "🛑"
