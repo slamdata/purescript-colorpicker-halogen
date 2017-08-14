@@ -46,7 +46,7 @@ import NumberInput.Halogen.Component as Num
 type ValueProgress a =  { current ∷ a, next ∷ a }
 type State =
   { color ∷ ValueProgress Color
-  , inputs ∷ Map Cursor (Either String String)
+  , inputs ∷ Map Cursor (Either String String) -- Left is invalid, Right is valid
   , props ∷ Props
   }
 
@@ -160,6 +160,14 @@ renderLayout state@{ color, inputs, props} cursor = case _ of
   colorEnv = calcColorEnv color.next
   renderColorComponent ∷ State → Cursor → ColorComponent → HTML m
   renderColorComponent { inputs, props } cursor = case _ of
+    -- TODO refactor so spec is just a function of type
+    -- ∷ ∀ p r i
+    -- . ColorEnv
+    -- → IProp (onMouseDown :: MouseEvent, onTouchStart :: TouchEvent | r) i
+    -- → Array (HTML p i)
+    --
+    -- we can make other specs in the same fession instead
+    --   off caryng around multipe env -> style functions
     DragComponentSpec spec →
       let
         root = spec.root colorEnv
@@ -293,15 +301,13 @@ propagate ∷ ∀ m. DSL m Unit
 propagate = do
   { color, props: { layout }} ← H.get
   propagateLayout
-    color
     (calcColorEnv color.next)
     List.Nil
     layout
   where
-  -- TODO at this point `color` arg can be removed
-  propagateLayout ∷ ValueProgress Color → ColorEnv → Cursor → L.Layout → DSL m Unit
-  propagateLayout color colorEnv cursor = case _ of
-    L.Group _ l → void $ sequence $ mapWithIndex (\idx → propagateLayout color colorEnv (List.Cons idx cursor)) l
+  propagateLayout ∷ ColorEnv → Cursor → L.Layout → DSL m Unit
+  propagateLayout colorEnv cursor = case _ of
+    L.Group _ l → void $ sequence $ mapWithIndex (\idx → propagateLayout colorEnv (List.Cons idx cursor)) l
     L.Stage → pure unit
     L.Actions → pure unit
     L.Component c → case c of

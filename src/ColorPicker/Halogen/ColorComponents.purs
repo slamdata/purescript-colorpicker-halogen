@@ -49,6 +49,7 @@ type Dynamic s = ColorEnv → s
 
 type Classes = Array ClassName
 
+-- TODO make sure all css and classes are used properly (hint: number input)
 type Styles =
   { classes ∷ Classes
   , css ∷ CSS
@@ -58,6 +59,7 @@ type PreNumConf = { prefix ∷ String, title ∷ String, placeholder ∷ String,
 
 type PreTextConf = { prefix ∷ String, title ∷ String, placeholder ∷ String }
 
+-- TODO add Lazy
 type ColorEnv =
   { hsl ∷ RecordHSLA
   , hsv ∷ RecordHSVA
