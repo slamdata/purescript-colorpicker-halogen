@@ -84,7 +84,7 @@ data Query a
   -- TODO `ComponentUpdate` could be removed at some point
   | ComponentUpdate (Color → Maybe Color) a
   | NumberComponentUpdate Cursor (Maybe Number) a
-  | TextComponentUpdate Cursor String a
+  | TextComponentUpdate Cursor (String → Maybe Color) String a
   | Commit a
   | Init a
   | GetValue (ValueProgress Color → a)
@@ -212,7 +212,7 @@ renderLayout state@{ color, inputs, props} cursor = case _ of
         , HP.title config.title
         , HP.placeholder config.placeholder
         , HP.value $ either id id val
-        , HE.onValueInput $ HE.input $ TextComponentUpdate cursor
+        , HE.onValueInput $ HE.input $ TextComponentUpdate cursor fromString
         ]
     where
     input styles label child =
@@ -225,18 +225,15 @@ colorClasses props c = classesFor props $ if Color.isLight c then IsLight else I
 
 eval ∷ ∀ m r. MonadAff (PickerEffects r) m ⇒ Query ~> DSL m
 eval = case _ of
-  TextComponentUpdate cursor str next → do
+  TextComponentUpdate cursor fromString str next → do
     {props} ← H.get
-    case focus cursor props.layout of
-      Just (L.Component (TextComponentSpec { fromString })) → do
-        let
-          color = fromString str
-          val = case color of
-            Nothing → Left str
-            Just _ → Right str
-        H.modify \s → s { inputs = insert cursor val s.inputs }
-        eval $ ComponentUpdate (const color) next
-      _ → pure next
+    let
+      color = fromString str
+      val = case color of
+        Nothing → Left str
+        Just _ → Right str
+    H.modify \s → s { inputs = insert cursor val s.inputs }
+    eval $ ComponentUpdate (const color) next
   NumberComponentUpdate cursor num next → do
     { color, props } ← H.get
     case focus cursor props.layout of
