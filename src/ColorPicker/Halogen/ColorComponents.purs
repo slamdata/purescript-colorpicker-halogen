@@ -26,11 +26,12 @@ module ColorPicker.Halogen.ColorComponents
   , componentDragHue
   , componentDragSV
   , mapInputProps
-  , toDynamicStyles
+  , ExistsRow
   , DragComponentView(..)
-  , DragComponentViewX
-  , mkDragComponentViewX
-  , unDragComponentViewX
+  , mkExistsRow
+  , runExistsRow
+  , TextComponentView(..)
+  , NumberComponentView(..)
   ) where
 
 import Prelude
@@ -39,9 +40,12 @@ import CSS (CSS)
 import CSS as CSS
 import Color (Color)
 import Color as Color
-import DOM.Event.Types (MouseEvent, TouchEvent)
+import Control.MonadZero (guard)
+import DOM.Event.Types (Event, MouseEvent, TouchEvent)
+import Data.Either (Either, either, isLeft)
 import Data.Int (floor, toNumber)
 import Data.Maybe (Maybe(..))
+import Data.Newtype (class Newtype)
 import Data.String as String
 import Halogen (ClassName)
 import Halogen.HTML as HH
@@ -87,41 +91,50 @@ type InputProps c =
 
 data ColorComponent
   = NumberComponentSpec
-    { hasNumVal ∷ Num.HasNumberInputValue Number
-    , update ∷ Number → Dynamic (Maybe Color)
+    { update ∷ Number → Dynamic (Maybe Color)
     , read ∷ Dynamic Number
-    , config ∷ PreNumConf
-    , styles ∷ InputProps (Dynamic Styles)
+    , props ∷ Num.Props Number
+    , view ∷ NumberComponentView
     }
   | TextComponentSpec
     { fromString ∷ String → Maybe Color
-    , toString ∷ Dynamic String
-    , config ∷ PreTextConf
-    , styles ∷ InputProps (Dynamic Styles)
+    , toString ∷ Dynamic String -- TODO remove to as in view we already ahve ColorEnv
+    , view ∷ ExistsRow TextComponentView
     }
   | DragComponentSpec
     { update ∷ PositionUpdate
-    , view ∷ DragComponentViewX
+    , view ∷ ExistsRow DragComponentView
     }
 
 
--- generalise to some View type parametrised by required rows
-data DragComponentView
-  = DragComponentView
-  ( ∀ r
-  . ColorEnv
+newtype NumberComponentView = NumberComponentView
+  ( ColorEnv
+  → HH.HTML Void Void
+  → HH.HTML Void Void)
+
+derive instance numberComponentViewNewType :: Newtype NumberComponentView _
+
+newtype TextComponentView r = TextComponentView
+  ( ColorEnv
+  → Either String String -- TODO update to Maybe String (for invlaid strings)
+  → Array (HH.IProp (value :: String, onInput :: Event | r) Void)
+  → HH.HTML Void Void)
+
+newtype DragComponentView r = DragComponentView
+  ( ColorEnv
   → Array (HH.IProp (onMouseDown :: MouseEvent, onTouchStart :: TouchEvent | r) Void)
   → HH.HTML Void Void)
 
 
-foreign import data DragComponentViewX :: Type
 
-mkDragComponentViewX :: forall r. DragComponentView -> DragComponentViewX
-mkDragComponentViewX = unsafeCoerce
 
-unDragComponentViewX :: forall a. (DragComponentView -> a) -> DragComponentViewX -> a
-unDragComponentViewX = unsafeCoerce
+foreign import data ExistsRow :: (# Type -> Type) -> Type
 
+mkExistsRow :: ∀ f r. f r -> ExistsRow f
+mkExistsRow = unsafeCoerce
+
+runExistsRow :: ∀ f a. (∀ r. f r -> a) -> ExistsRow f -> a
+runExistsRow = unsafeCoerce
 
 componentDragSV ∷
   { isLight ∷ Array ClassName
@@ -132,7 +145,7 @@ componentDragSV ∷
   → ColorComponent
 componentDragSV classes = DragComponentSpec
   { update: \{x, y} {hsv} → Color.hsv hsv.h x (1.0 - y)
-  , view: mkDragComponentViewX $ DragComponentView \{isLight, hsv, color} props ->
+  , view: mkExistsRow $ DragComponentView \{isLight, hsv, color} props ->
       HH.div
         ([ HP.classes $ classes.root <> if isLight then classes.isLight else classes.isDark
         , HCSS.style $ CSS.backgroundColor $ Color.hsl hsv.h 1.0 0.5
@@ -156,7 +169,7 @@ componentDragHue ∷
   → ColorComponent
 componentDragHue classes = DragComponentSpec
   { update: \{y} {hsl} → Color.hsl ((1.0 - y) * 360.0) hsl.s hsl.l
-  , view: mkDragComponentViewX $ DragComponentView \{isLight, hsv, color} props ->
+  , view: mkExistsRow $ DragComponentView \{isLight, hsv, color} props ->
       HH.div
         ([ HP.classes classes.root ] <> props)
         [ HH.div
@@ -167,42 +180,61 @@ componentDragHue classes = DragComponentSpec
         ]
     }
 
-componentHue ∷ InputProps Classes → ColorComponent
-componentHue classes = NumberComponentSpec
-  { styles: toDynamicStyles classes
-  , hasNumVal: hasValRound
-  , update: \n {color} → Just $ modifyHSL (_{h = n}) color
-  , read: \({rgb, hsv, hsl}) → roundFractionalNum hsl.h
-  , config: confHue
+mkNumComponent
+  :: (Number -> Dynamic (Maybe Color))
+  -> Dynamic Number
+  -> InputProps Classes
+  -> PreNumConf
+  -> ColorComponent
+mkNumComponent update read classes conf = NumberComponentSpec
+  { update
+  , read
+  , props:
+    { title: conf.title
+    , hasNumberValue: hasValRound
+    , placeholder: conf.placeholder
+    , range: conf.range
+    , root: classes.elem
+    , rootInvalid: classes.elemInvalid
+    , rootLength: const []
+    }
+  , view: NumberComponentView \ {} input -> renderInput
+      { root: classes.root
+      , label: classes.label
+      , prefix: conf.prefix
+      , child: input
+      }
   }
+
+
+componentHue ∷ InputProps Classes → ColorComponent
+componentHue classes = mkNumComponent
+  (\n {color} → Just $ modifyHSL (_{h = n}) color)
+  (\({rgb, hsv, hsl}) → roundFractionalNum hsl.h)
+  classes
+  confHue
 
 
 componentSaturationHSL ∷ InputProps Classes → ColorComponent
-componentSaturationHSL classes = NumberComponentSpec
-  { styles: toDynamicStyles classes
-  , hasNumVal: hasValRound
-  , update: \n {color} → Just $ modifyHSL (_{s = n / 100.0}) color
-  , read: \({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * hsl.s
-  , config: confSaturation
-  }
+componentSaturationHSL classes = mkNumComponent
+  (\n {color} → Just $ modifyHSL (_{s = n / 100.0}) color)
+  (\({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * hsl.s)
+  classes
+  confSaturation
 
 componentLightness ∷ InputProps Classes → ColorComponent
-componentLightness classes = NumberComponentSpec
-  { styles: toDynamicStyles classes
-  , hasNumVal: hasValRound
-  , update: \n {color} → Just $ modifyHSL (_{l = n / 100.0}) color
-  , read: \({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * hsl.l
-  , config: confLightness
-  }
+componentLightness classes = mkNumComponent
+  (\n {color} → Just $ modifyHSL (_{l = n / 100.0}) color)
+  (\({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * hsl.l)
+  classes
+  confLightness
 
 componentSaturationHSV ∷ InputProps Classes → ColorComponent
-componentSaturationHSV classes = NumberComponentSpec
-  { styles: toDynamicStyles classes
-  , hasNumVal: hasValRound
-  , update: \n {color} → Just $ modifyHSV (_{s = n / 100.0}) color
-  , read: \({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * hsv.s
-  , config: confSaturation
-  }
+componentSaturationHSV classes = mkNumComponent
+  (\n {color} → Just $ modifyHSV (_{s = n / 100.0}) color)
+  (\({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * hsv.s)
+  classes
+  confSaturation
 
 mapInputProps :: ∀ a b. (a -> b) -> InputProps a -> InputProps b
 mapInputProps f { root, label, elem, elemInvalid } =
@@ -216,52 +248,66 @@ toDynamicStyles :: InputProps Classes -> InputProps (Dynamic Styles)
 toDynamicStyles = mapInputProps $ { classes: _, css: pure unit } >>> const
 
 componentValue ∷ InputProps Classes → ColorComponent
-componentValue classes = NumberComponentSpec
-  { styles: toDynamicStyles classes
-  , hasNumVal: hasValRound
-  , update: \n {color} → Just $ modifyHSV (_{v = n / 100.0}) color
-  , read: \({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * hsv.v
-  , config: confValue
-  }
+componentValue classes = mkNumComponent
+  (\n {color} → Just $ modifyHSV (_{v = n / 100.0}) color)
+  (\({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * hsv.v)
+  classes
+  confValue
 
 componentRed ∷ InputProps Classes → ColorComponent
-componentRed classes = NumberComponentSpec
-  { styles: toDynamicStyles classes
-  , hasNumVal: hasValCail
-  , update: \n {color} → Just $ modifyRGB (_{r = asInt n}) color
-  , read: \({rgb, hsv, hsl}) → roundNum $ toNumber rgb.r
-  , config: confRed
-  }
+componentRed classes = mkNumComponent
+  (\n {color} → Just $ modifyRGB (_{r = asInt n}) color)
+  (\({rgb, hsv, hsl}) → roundNum $ toNumber rgb.r)
+  classes
+  confRed
 
 componentGreen ∷ InputProps Classes → ColorComponent
-componentGreen classes = NumberComponentSpec
-  { styles: toDynamicStyles classes
-  , hasNumVal: hasValCail
-  , update: \n {color} → Just $ modifyRGB (_{g = asInt n}) color
-  , read: \({rgb, hsv, hsl}) → roundNum $ toNumber rgb.g
-  , config: confGreen
-  }
+componentGreen classes = mkNumComponent
+  (\n {color} → Just $ modifyRGB (_{g = asInt n}) color)
+  (\({rgb, hsv, hsl}) → roundNum $ toNumber rgb.g)
+  classes
+  confGreen
 
 componentBlue ∷ InputProps Classes → ColorComponent
-componentBlue classes = NumberComponentSpec
-  { styles: toDynamicStyles classes
-  , hasNumVal: hasValCail
-  , update: \n {color} → Just $ modifyRGB (_{b = asInt n}) color
-  , read: \({rgb, hsv, hsl}) → roundNum $ toNumber rgb.b
-  , config: confBlue
-  }
+componentBlue classes = mkNumComponent
+  (\n {color} → Just $ modifyRGB (_{b = asInt n}) color)
+  (\({rgb, hsv, hsl}) → roundNum $ toNumber rgb.b)
+  classes
+  confBlue
 
 componentHEX ∷ InputProps Classes → ColorComponent
 componentHEX classes = TextComponentSpec
-  { styles: toDynamicStyles classes
-  , fromString: \str → Color.fromHexString $ "#" <> str
+  { fromString: \str → Color.fromHexString $ "#" <> str
   , toString: \{color} → String.toUpper $ String.drop 1 $ Color.toHexString color
-  , config:
-      { prefix: "#"
-      , title: "Hex"
-      , placeholder: "HEX"
+  , view: mkExistsRow $ TextComponentView \env val props -> renderInput
+      { root: classes.root
+      , label: classes.label
+      , prefix: "#"
+      , child: HH.input $
+          [ HP.type_ HP.InputText
+          , HP.classes
+            $  classes.elem
+            <> (guard (isLeft val) *> (classes.elemInvalid))
+          , HP.title "Hex"
+          , HP.value $ either id id val
+          , HP.placeholder "Hex"
+          ] <> props
       }
   }
+
+renderInput :: ∀ i p.
+  { child :: HH.HTML i p
+  , prefix :: String
+  , label :: Classes
+  , root :: Classes
+  }
+  -> HH.HTML i p
+renderInput {root, label, prefix, child} =
+  HH.label
+    [ HP.classes root]
+    [ HH.span [HP.classes label] [HH.text prefix]
+    , child
+    ]
 
 componentSL ∷ Array (InputProps Classes → ColorComponent)
 componentSL = [componentSaturationHSL, componentLightness]

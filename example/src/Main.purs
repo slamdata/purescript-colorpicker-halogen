@@ -3,7 +3,6 @@ module Main where
 import Prelude
 
 import Color (Color, rgb)
-import ColorPicker.Halogen.ColorComponents (toDynamicStyles)
 import ColorPicker.Halogen.ColorComponents as C
 import ColorPicker.Halogen.Component as CPicker
 import ColorPicker.Halogen.Layout as L
@@ -57,7 +56,7 @@ render ∷ ∀ m r. MonadAff (CPicker.PickerEffects r) m => State → HTML m
 render state = HH.div_
   $ renderPicker 0 config0
   <> renderPicker 1 config1
-  <> renderPicker 2 config2
+  -- <> renderPicker 2 config2
 
   where
   renderPicker idx conf =
@@ -95,22 +94,21 @@ config1 = mkConf id
   , C.componentRGB <> [C.componentHEX]
   ]
 
-config2 ∷ CPicker.Props
-config2 = mkConf id
-  (ClassName "ColorPicker--small")
-  [ [ const componentRedORNoRed ]]
+-- config2 ∷ CPicker.Props
+-- config2 = mkConf id
+--   (ClassName "ColorPicker--small")
+--   [ [ const componentRedORNoRed ]]
 
-componentRedORNoRed ∷ C.ColorComponent
-componentRedORNoRed = C.TextComponentSpec
-  { styles: toDynamicStyles inputClasses
-  , fromString: \str → if str == "red" then Just (rgb 255 0 0) else Nothing
-  , toString: \{color} → if color == (rgb 255 0 0) then "red" else "nored"
-  , config:
-      { title: "red or nored?"
-      , prefix: "🛑"
-      , placeholder: "red"
-      }
-  }
+-- componentRedORNoRed ∷ C.ColorComponent
+-- componentRedORNoRed = C.textComponent
+--   { fromString: \str → if str == "red" then Just (rgb 255 0 0) else Nothing
+--   , toString: \{color} → if color == (rgb 255 0 0) then "red" else "nored"
+--   , config:
+--       { title: "red or nored?"
+--       , prefix: "🛑"
+--       , placeholder: "red"
+--       }
+--   }
 
 mkConf
   ∷ (∀ a. Array a → Array a)

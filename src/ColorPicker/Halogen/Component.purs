@@ -16,11 +16,10 @@ import Prelude
 import CSS as CSS
 import Color (Color)
 import Color as Color
-import ColorPicker.Halogen.ColorComponents (ColorComponent(..), ColorEnv, PositionUpdate, mapInputProps, DragComponentView(..), DragComponentViewX, unDragComponentViewX)
+import ColorPicker.Halogen.ColorComponents (ColorComponent(..), ColorEnv, PositionUpdate, mapInputProps, DragComponentView(..), TextComponentView(..), runExistsRow)
 import ColorPicker.Halogen.Layout as L
 import ColorPicker.Halogen.Utils.Drag as Drag
 import Control.Monad.Aff.Class (class MonadAff)
-import Control.MonadZero (guard)
 import DOM.Classy.Event (preventDefault)
 import DOM.Event.Types (MouseEvent, TouchEvent)
 import Data.Array (index, mapWithIndex)
@@ -31,8 +30,9 @@ import Data.Foldable (foldMap, foldr, for_)
 import Data.Functor.Coproduct.Nested as Coproduct
 import Data.List as List
 import Data.Map (Map, insert, lookup)
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.Monoid (mempty)
+import Data.Newtype (unwrap)
 import Data.Traversable (sequence)
 import Halogen (liftEff)
 import Halogen as H
@@ -43,6 +43,7 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Query.HalogenM (halt)
 import NumberInput.Halogen.Component as Num
+import Unsafe.Coerce (unsafeCoerce)
 
 
 type ValueProgress a =  { current ∷ a, next ∷ a }
@@ -162,48 +163,32 @@ renderLayout state@{ color, inputs, props} cursor = case _ of
   colorEnv = calcColorEnv color.next
   renderColorComponent ∷ State → Cursor → ColorComponent → HTML m
   renderColorComponent { inputs, props } cursor = case _ of
-    -- TODO refactor so spec is just a function of type
-    -- ∷ ∀ p r i
-    -- . ColorEnv
-    -- → IProp (onMouseDown :: MouseEvent, onTouchStart :: TouchEvent | r) i
-    -- → Array (HTML p i)
-    --
-    -- we can make other specs in the same fession instead
-    --   off caryng around multipe env -> style functions
-    DragComponentSpec spec → renderDrag colorEnv spec
-    NumberComponentSpec { styles, hasNumVal, update, config } → let computedStyles = mapInputProps (_ $ colorEnv) styles in
-      input computedStyles config.prefix
-        $ pure
+    DragComponentSpec spec →
+      let
+        run :: ∀ r. DragComponentView r -> HTML m
+        run (DragComponentView view) = unHTML $ view colorEnv $ mkProps
+          [ HE.onMouseDown $ HE.input (Left >>> DragStart spec.update)
+          , HE.onTouchStart $ HE.input (Right >>> DragStart spec.update)
+          ]
+      in runExistsRow run spec.view
+    NumberComponentSpec spec →
+      unHTML
+        $ unwrap spec.view colorEnv
+        $ mkHTML
         $ HH.slot'
           cpNumComponent
           cursor
           Num.input
-          { title: config.title
-          , hasNumberValue: hasNumVal
-          , placeholder: config.placeholder
-          , range: config.range
-          , root: computedStyles.elem.classes
-          , rootInvalid: computedStyles.elemInvalid.classes
-          , rootLength: const []
-          }
+          spec.props
         $ HE.input \(Num.NotifyChange val) → NumberComponentUpdate cursor val
-    TextComponentSpec { styles, fromString, config } → let computedStyles = mapInputProps (_ $ colorEnv) styles in
-      input computedStyles config.prefix
-        $ flip foldMap (lookup cursor inputs) \val → pure
-        $ HH.input
-        [ HP.type_ HP.InputText
-        , HP.classes
-          $  computedStyles.elem.classes
-          <> (guard (isLeft val) *> (computedStyles.elemInvalid.classes))
-        , HP.title config.title
-        , HP.placeholder config.placeholder
-        , HP.value $ either id id val
-        , HE.onValueInput $ HE.input $ TextComponentUpdate cursor fromString
-        ]
-    where
-    input styles label child =
-      HH.label [HP.classes styles.root.classes] $
-        [ HH.span [HP.classes styles.label.classes] [HH.text label]] <> child
+    TextComponentSpec spec →
+      let
+        run :: ∀ r. TextComponentView r -> HTML m
+        run (TextComponentView view) = bimap absurd absurd $ view colorEnv val $ mkProps
+          [ HE.onValueInput $ HE.input $ TextComponentUpdate cursor spec.fromString ]
+        val :: Either String String
+        val = maybe (Right $ spec.toString colorEnv) id $ lookup cursor inputs
+      in runExistsRow run spec.view
 
 colorClasses ∷ Props → Color → Array HH.ClassName
 colorClasses props c = classesFor props $ if Color.isLight c then IsLight else IsDark
@@ -313,32 +298,44 @@ focus cursor layout = foldr f (Just layout) cursor
     Just (L.Group _ l) → index l idx
     _ → Nothing
 
-props :: forall r.
-  PositionUpdate -> Array
-       (HH.IProp
-          ( onMouseDown :: MouseEvent
-          , onTouchStart :: TouchEvent
-          | r
-          )
-          (Query Unit)
-       )
-props update =
-  [ HE.onMouseDown $ HE.input (Left >>> DragStart update)
-  , HE.onTouchStart $ HE.input (Right >>> DragStart update)
-  ]
+mkHTML
+  ∷ ∀ p i
+  . HH.HTML p i
+  → HH.HTML Void Void
+mkHTML = unsafeCoerce
 
-renderDrag
-  ∷ ∀ m q
-  . ColorEnv
-  → { update ∷ PositionUpdate
-    , view ∷ DragComponentViewX
-    }
-  → HTML m
-renderDrag colorEnv spec = unDragComponentViewX (\(DragComponentView f) -> bimap absurd absurd $ f colorEnv []) spec.view
+unHTML
+  ∷ ∀ p i
+  . HH.HTML Void Void
+  -> HH.HTML p i
+unHTML = bimap absurd absurd
 
 
--- funcMM :: ∀ r i p
---   . DragComponentViewX
---   → DragComponentView r i p
--- -- funcMM view = unDragComponentViewX (\(DragComponentView x) -> DragComponentView x) view
--- funcMM view =
+mkProps
+  ∷ ∀ r
+  . Array (HH.IProp r (Query Unit))
+  → Array (HH.IProp r Void)
+mkProps = unsafeCoerce
+
+{-- error without unsafeCoerce
+Could not match type
+
+Query Unit
+
+with type
+
+Void
+
+while trying to match type IProp
+                       ( onMouseDown :: MouseEvent
+                       | t1
+                       )
+                       t2
+with type IProp
+        ( onMouseDown :: MouseEvent
+        , onTouchStart :: TouchEvent
+        | t0
+        )
+        Void
+
+--}
