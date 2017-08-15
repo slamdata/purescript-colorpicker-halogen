@@ -27,6 +27,10 @@ module ColorPicker.Halogen.ColorComponents
   , componentDragSV
   , mapInputProps
   , toDynamicStyles
+  , DragComponentView(..)
+  , DragComponentViewX
+  , mkDragComponentViewX
+  , unDragComponentViewX
   ) where
 
 import Prelude
@@ -35,13 +39,18 @@ import CSS (CSS)
 import CSS as CSS
 import Color (Color)
 import Color as Color
+import DOM.Event.Types (MouseEvent, TouchEvent)
 import Data.Int (floor, toNumber)
 import Data.Maybe (Maybe(..))
 import Data.String as String
 import Halogen (ClassName)
+import Halogen.HTML as HH
+import Halogen.HTML.CSS as HCSS
+import Halogen.HTML.Properties as HP
 import Math (round)
 import NumberInput.Halogen.Component as Num
 import NumberInput.Range (Range(..))
+import Unsafe.Coerce (unsafeCoerce)
 
 type PositionUpdate = { x ∷ Number, y ∷ Number } → Dynamic Color
 
@@ -91,10 +100,27 @@ data ColorComponent
     , styles ∷ InputProps (Dynamic Styles)
     }
   | DragComponentSpec
-    { root ∷ Dynamic Styles
-    , selector ∷ Dynamic Styles
-    , update ∷ PositionUpdate
+    { update ∷ PositionUpdate
+    , view ∷ DragComponentViewX
     }
+
+
+-- generalise to some View type parametrised by required rows
+data DragComponentView
+  = DragComponentView
+  ( ∀ r
+  . ColorEnv
+  → Array (HH.IProp (onMouseDown :: MouseEvent, onTouchStart :: TouchEvent | r) Void)
+  → HH.HTML Void Void)
+
+
+foreign import data DragComponentViewX :: Type
+
+mkDragComponentViewX :: forall r. DragComponentView -> DragComponentViewX
+mkDragComponentViewX = unsafeCoerce
+
+unDragComponentViewX :: forall a. (DragComponentView -> a) -> DragComponentViewX -> a
+unDragComponentViewX = unsafeCoerce
 
 
 componentDragSV ∷
@@ -105,21 +131,23 @@ componentDragSV ∷
   }
   → ColorComponent
 componentDragSV classes = DragComponentSpec
-  { update : \{x, y} {color} →
-      let hsv = Color.toHSVA color
-      in Color.hsv hsv.h x (1.0 - y)
-  , root: \{isLight, hsv} →
-    { classes: classes.root <> if isLight then classes.isLight else classes.isDark
-    , css: CSS.backgroundColor $ Color.hsl hsv.h 1.0 0.5
+  { update: \{x, y} {hsv} → Color.hsv hsv.h x (1.0 - y)
+  , view: mkDragComponentViewX $ DragComponentView \{isLight, hsv, color} props ->
+      HH.div
+        ([ HP.classes $ classes.root <> if isLight then classes.isLight else classes.isDark
+        , HCSS.style $ CSS.backgroundColor $ Color.hsl hsv.h 1.0 0.5
+        ] <> props) -- TODO error here
+        [ HH.div
+          [ HP.classes classes.selector
+          , HCSS.style do
+              CSS.left $ CSS.pct (hsv.s * 100.0)
+              CSS.bottom $ CSS.pct (hsv.v * 100.0)
+              CSS.backgroundColor color
+          ]
+          []
+        ]
     }
-  , selector: \{hsv, color} →
-    { classes: classes.selector
-    , css: do
-        CSS.left $ CSS.pct (hsv.s * 100.0)
-        CSS.bottom $ CSS.pct (hsv.v * 100.0)
-        CSS.backgroundColor color
-    }
-  }
+
 
 componentDragHue ∷
   { root ∷ Array ClassName
@@ -127,18 +155,17 @@ componentDragHue ∷
   }
   → ColorComponent
 componentDragHue classes = DragComponentSpec
-  { update : \{y} {color} →
-      let hsl = Color.toHSLA $ color
-      in (Color.hsl ((1.0 - y) * 360.0) hsl.s hsl.l)
-  , root: \_ →
-    { classes: classes.root
-    , css: pure unit
+  { update: \{y} {hsl} → Color.hsl ((1.0 - y) * 360.0) hsl.s hsl.l
+  , view: mkDragComponentViewX $ DragComponentView \{isLight, hsv, color} props ->
+      HH.div
+        ([ HP.classes classes.root ] <> props)
+        [ HH.div
+          [ HP.classes classes.selector
+          , HCSS.style $ CSS.top $ CSS.pct ((1.0 - hsv.h / 360.0) * 100.0)
+          ]
+          []
+        ]
     }
-  , selector: \{hsv} →
-    { classes: classes.selector
-    , css: CSS.top $ CSS.pct ((1.0 - hsv.h / 360.0) * 100.0)
-    }
-  }
 
 componentHue ∷ InputProps Classes → ColorComponent
 componentHue classes = NumberComponentSpec

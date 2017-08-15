@@ -16,13 +16,15 @@ import Prelude
 import CSS as CSS
 import Color (Color)
 import Color as Color
-import ColorPicker.Halogen.ColorComponents (ColorComponent(..), ColorEnv, PositionUpdate, mapInputProps)
+import ColorPicker.Halogen.ColorComponents (ColorComponent(..), ColorEnv, PositionUpdate, mapInputProps, DragComponentView(..), DragComponentViewX, unDragComponentViewX)
 import ColorPicker.Halogen.Layout as L
 import ColorPicker.Halogen.Utils.Drag as Drag
 import Control.Monad.Aff.Class (class MonadAff)
 import Control.MonadZero (guard)
 import DOM.Classy.Event (preventDefault)
+import DOM.Event.Types (MouseEvent, TouchEvent)
 import Data.Array (index, mapWithIndex)
+import Data.Bifunctor (bimap)
 import Data.Either (Either(..), either, isLeft)
 import Data.Either.Nested as Either
 import Data.Foldable (foldMap, foldr, for_)
@@ -168,23 +170,7 @@ renderLayout state@{ color, inputs, props} cursor = case _ of
     --
     -- we can make other specs in the same fession instead
     --   off caryng around multipe env -> style functions
-    DragComponentSpec spec →
-      let
-        root = spec.root colorEnv
-        selector = spec.selector colorEnv
-      in
-        HH.div
-          [ HP.classes root.classes
-          , HCSS.style $ root.css
-          , HE.onMouseDown $ HE.input (Left >>> DragStart spec.update)
-          , HE.onTouchStart $ HE.input (Right >>> DragStart spec.update)
-          ]
-          [ HH.div
-            [ HP.classes $ selector.classes
-            , HCSS.style $ selector.css
-            ]
-            []
-          ]
+    DragComponentSpec spec → renderDrag colorEnv spec
     NumberComponentSpec { styles, hasNumVal, update, config } → let computedStyles = mapInputProps (_ $ colorEnv) styles in
       input computedStyles config.prefix
         $ pure
@@ -326,3 +312,33 @@ focus cursor layout = foldr f (Just layout) cursor
   f idx = case _ of
     Just (L.Group _ l) → index l idx
     _ → Nothing
+
+props :: forall r.
+  PositionUpdate -> Array
+       (HH.IProp
+          ( onMouseDown :: MouseEvent
+          , onTouchStart :: TouchEvent
+          | r
+          )
+          (Query Unit)
+       )
+props update =
+  [ HE.onMouseDown $ HE.input (Left >>> DragStart update)
+  , HE.onTouchStart $ HE.input (Right >>> DragStart update)
+  ]
+
+renderDrag
+  ∷ ∀ m q
+  . ColorEnv
+  → { update ∷ PositionUpdate
+    , view ∷ DragComponentViewX
+    }
+  → HTML m
+renderDrag colorEnv spec = unDragComponentViewX (\(DragComponentView f) -> bimap absurd absurd $ f colorEnv []) spec.view
+
+
+-- funcMM :: ∀ r i p
+--   . DragComponentViewX
+--   → DragComponentView r i p
+-- -- funcMM view = unDragComponentViewX (\(DragComponentView x) -> DragComponentView x) view
+-- funcMM view =
