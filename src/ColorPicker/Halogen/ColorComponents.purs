@@ -45,7 +45,6 @@ import DOM.Event.Types (Event, MouseEvent, TouchEvent)
 import Data.Either (Either, either, isLeft)
 import Data.Int (floor, toNumber)
 import Data.Maybe (Maybe(..))
-import Data.Newtype (class Newtype)
 import Data.String as String
 import Halogen (ClassName)
 import Halogen.HTML as HH
@@ -108,25 +107,26 @@ data ColorComponent
 
 
 newtype NumberComponentView = NumberComponentView
-  ( ColorEnv
-  → HH.HTML Void Void
-  → HH.HTML Void Void)
-
-derive instance numberComponentViewNewType :: Newtype NumberComponentView _
+  ( ∀ p i
+  . ColorEnv
+  → HH.HTML p i
+  → HH.HTML p i
+  )
 
 newtype TextComponentView r = TextComponentView
-  ( ColorEnv
+  ( ∀ p i
+  . ColorEnv
   → Either String String -- TODO update to Maybe String (for invlaid strings)
-  → Array (HH.IProp (value :: String, onInput :: Event | r) Void)
-  → HH.HTML Void Void)
+  → Array (HH.IProp (value :: String, onInput :: Event | r) i)
+  → HH.HTML p i
+  )
 
 newtype DragComponentView r = DragComponentView
-  ( ColorEnv
-  → Array (HH.IProp (onMouseDown :: MouseEvent, onTouchStart :: TouchEvent | r) Void)
-  → HH.HTML Void Void)
-
-
-
+  ( ∀ p i
+  . ColorEnv
+  → Array (HH.IProp (onMouseDown :: MouseEvent, onTouchStart :: TouchEvent | r) i)
+  → HH.HTML p i
+  )
 
 foreign import data ExistsRow :: (# Type -> Type) -> Type
 
