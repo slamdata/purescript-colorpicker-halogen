@@ -44,7 +44,7 @@ import Color as Color
 import Control.MonadZero (guard)
 import DOM.Event.Types (Event, FocusEvent, MouseEvent, TouchEvent)
 import Data.Int (floor, toNumber)
-import Data.Maybe (Maybe(..), isJust, maybe, maybe')
+import Data.Maybe (Maybe(..), maybe, maybe')
 import Data.String as String
 import Halogen (ClassName)
 import Halogen.HTML as HH
@@ -140,7 +140,7 @@ componentDragSV ∷
   }
   → ColorComponent
 componentDragSV classes = DragComponentSpec
-  { update: \{x, y} {hsv} → Color.hsv hsv.h x (1.0 - y)
+  { update: \{x, y} → modifyHSV _{ s = x, v = 1.0 - y}
   , view: mkExistsRow $ DragComponentView \{isLight, hsv, color} props ->
       HH.div
         ([ HP.classes $ classes.root <> if isLight then classes.isLight else classes.isDark
@@ -164,7 +164,7 @@ componentDragHue ∷
   }
   → ColorComponent
 componentDragHue classes = DragComponentSpec
-  { update: \{y} {hsl} → Color.hsl ((1.0 - y) * 360.0) hsl.s hsl.l
+  { update: \{y} → modifyHSL _{ h = (1.0 - y) * 360.0 }
   , view: mkExistsRow $ DragComponentView \{isLight, hsv, color} props ->
       HH.div
         ([ HP.classes classes.root ] <> props)
@@ -205,7 +205,7 @@ mkNumComponent update read classes conf = NumberComponentSpec
 
 componentHue ∷ InputProps Classes → ColorComponent
 componentHue classes = mkNumComponent
-  (\n {color} → Just $ modifyHSL (_{h = n}) color)
+  (\n → Just <<< modifyHSL (_{h = n}))
   (\({rgb, hsv, hsl}) → roundFractionalNum hsl.h)
   classes
   confHue
@@ -213,21 +213,21 @@ componentHue classes = mkNumComponent
 
 componentSaturationHSL ∷ InputProps Classes → ColorComponent
 componentSaturationHSL classes = mkNumComponent
-  (\n {color} → Just $ modifyHSL (_{s = n / 100.0}) color)
+  (\n → Just <<< modifyHSL (_{s = n / 100.0}))
   (\({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * hsl.s)
   classes
   confSaturation
 
 componentLightness ∷ InputProps Classes → ColorComponent
 componentLightness classes = mkNumComponent
-  (\n {color} → Just $ modifyHSL (_{l = n / 100.0}) color)
+  (\n → Just <<< modifyHSL (_{l = n / 100.0}))
   (\({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * hsl.l)
   classes
   confLightness
 
 componentSaturationHSV ∷ InputProps Classes → ColorComponent
 componentSaturationHSV classes = mkNumComponent
-  (\n {color} → Just $ modifyHSV (_{s = n / 100.0}) color)
+  (\n → Just <<< modifyHSV (_{s = n / 100.0}))
   (\({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * hsv.s)
   classes
   confSaturation
@@ -243,28 +243,28 @@ mapInputProps f { root, label, elem, elemInvalid } =
 
 componentValue ∷ InputProps Classes → ColorComponent
 componentValue classes = mkNumComponent
-  (\n {color} → Just $ modifyHSV (_{v = n / 100.0}) color)
+  (\n → Just <<< modifyHSV (_{v = n / 100.0}))
   (\({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * hsv.v)
   classes
   confValue
 
 componentRed ∷ InputProps Classes → ColorComponent
 componentRed classes = mkNumComponent
-  (\n {color} → Just $ modifyRGB (_{r = asInt n}) color)
+  (\n → Just <<< modifyRGB (_{r = asInt n}))
   (\({rgb, hsv, hsl}) → roundNum $ toNumber rgb.r)
   classes
   confRed
 
 componentGreen ∷ InputProps Classes → ColorComponent
 componentGreen classes = mkNumComponent
-  (\n {color} → Just $ modifyRGB (_{g = asInt n}) color)
+  (\n → Just <<< modifyRGB (_{g = asInt n}))
   (\({rgb, hsv, hsl}) → roundNum $ toNumber rgb.g)
   classes
   confGreen
 
 componentBlue ∷ InputProps Classes → ColorComponent
 componentBlue classes = mkNumComponent
-  (\n {color} → Just $ modifyRGB (_{b = asInt n}) color)
+  (\n → Just <<< modifyRGB (_{b = asInt n}))
   (\({rgb, hsv, hsl}) → roundNum $ toNumber rgb.b)
   classes
   confBlue
@@ -402,11 +402,11 @@ type RecordHSLA = { h ∷ Number, s ∷ Number, l ∷ Number, a ∷ Number }
 type RecordHSVA = { h ∷ Number, s ∷ Number, v ∷ Number, a ∷ Number }
 type RecordRGBA = { r ∷ Int, g ∷ Int, b ∷ Int, a ∷ Number }
 
-modifyHSL ∷ (RecordHSLA → RecordHSLA) → Color → Color
-modifyHSL f c = let {h, s, l, a} = f (Color.toHSLA c) in Color.hsla h s l a
+modifyHSL ∷ (RecordHSLA → RecordHSLA) → Dynamic Color
+modifyHSL f { hsl } = let {h, s, l, a} = f hsl in Color.hsla h s l a
 
-modifyHSV ∷ (RecordHSVA → RecordHSVA) → Color → Color
-modifyHSV f c = let {h, s, v, a} = f (Color.toHSVA c) in Color.hsva h s v a
+modifyHSV ∷ (RecordHSVA → RecordHSVA) → Dynamic Color
+modifyHSV f { hsv } = let {h, s, v, a} = f hsv in Color.hsva h s v a
 
-modifyRGB ∷ (RecordRGBA → RecordRGBA) → Color → Color
-modifyRGB f c = let {r, g, b, a} = f (Color.toRGBA c) in Color.rgba r g b a
+modifyRGB ∷ (RecordRGBA → RecordRGBA) → Dynamic Color
+modifyRGB f { rgb } = let {r, g, b, a} = f rgb in Color.rgba r g b a

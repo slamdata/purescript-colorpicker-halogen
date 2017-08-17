@@ -107,7 +107,10 @@ initialColor = Color.hsl 0.0 0.0 0.0
 
 picker ∷ ∀ m r. MonadAff (PickerEffects r) m ⇒ H.Component HH.HTML Query Props Message m
 picker = H.lifecycleParentComponent
-  { initialState: { color: { current: initialColor, next: initialColor }, inputValues: mempty, props: _ }
+  { initialState:
+      { color: { current: initialColor, next: initialColor }
+      , inputValues: mempty
+      , props: _ }
   , render
   , eval
   , receiver: HE.input SetProps
