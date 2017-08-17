@@ -8,11 +8,12 @@ import ColorPicker.Halogen.Component as CPicker
 import ColorPicker.Halogen.Layout as L
 import Control.Monad.Aff.Class (class MonadAff)
 import Control.Monad.Eff (Eff)
+import Control.MonadZero (guard)
 import Data.Array (reverse)
 import Data.Either.Nested as Either
 import Data.Functor.Coproduct.Nested as Coproduct
 import Data.Map (Map, fromFoldable, insert, lookup)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), maybe')
 import Data.Monoid (mempty)
 import Data.Tuple (Tuple(..))
 import Halogen (ClassName(..))
@@ -21,6 +22,7 @@ import Halogen.Aff as HA
 import Halogen.Component.ChildPath as CP
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
+import Halogen.HTML.Properties as HP
 import Halogen.VDom.Driver (runUI)
 
 main ∷ Eff (HA.HalogenEffects ()) Unit
@@ -56,7 +58,7 @@ render ∷ ∀ m r. MonadAff (CPicker.PickerEffects r) m => State → HTML m
 render state = HH.div_
   $ renderPicker 0 config0
   <> renderPicker 1 config1
-  -- <> renderPicker 2 config2
+  <> renderPicker 2 config2
 
   where
   renderPicker idx conf =
@@ -94,21 +96,35 @@ config1 = mkConf id
   , C.componentRGB <> [C.componentHEX]
   ]
 
--- config2 ∷ CPicker.Props
--- config2 = mkConf id
---   (ClassName "ColorPicker--small")
---   [ [ const componentRedORNoRed ]]
+config2 ∷ CPicker.Props
+config2 = mkConf id
+  (ClassName "ColorPicker--small")
+  [ [ const componentRedORNoRed ]]
 
--- componentRedORNoRed ∷ C.ColorComponent
--- componentRedORNoRed = C.textComponent
---   { fromString: \str → if str == "red" then Just (rgb 255 0 0) else Nothing
---   , toString: \{color} → if color == (rgb 255 0 0) then "red" else "nored"
---   , config:
---       { title: "red or nored?"
---       , prefix: "🛑"
---       , placeholder: "red"
---       }
---   }
+componentRedORNoRed ∷ C.ColorComponent
+componentRedORNoRed = C.TextComponentSpec
+  { fromString: \str → if str == "red" then Just (red) else Nothing
+  , view: C.mkExistsRow $ C.TextComponentView \env val props ->
+      HH.label
+        [ HP.classes inputClasses.root]
+        [ HH.span [HP.classes inputClasses.label] [HH.text "🛑"]
+        , HH.input $
+          [ HP.type_ HP.InputText
+          , HP.classes
+            $  inputClasses.elem
+            <> (guard (C.isInvalid val) *> (inputClasses.elemInvalid))
+          , HP.title "red or nored?"
+          , HP.value $ maybe' (\_ -> toString env) _.value val
+          , HP.placeholder "red"
+          ] <> props
+        ]
+  }
+  where
+  red = rgb 255 0 0
+  toString =  \{color} → if color == red then "red" else "noRed"
+
+
+
 
 mkConf
   ∷ (∀ a. Array a → Array a)

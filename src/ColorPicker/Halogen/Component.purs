@@ -16,21 +16,19 @@ import Prelude
 import CSS as CSS
 import Color (Color)
 import Color as Color
-import ColorPicker.Halogen.ColorComponents (ColorComponent(..), ColorEnv, DragComponentView(..), NumberComponentView(..), PositionUpdate, TextComponentView(..), mapInputProps, runExistsRow)
+import ColorPicker.Halogen.ColorComponents (ColorComponent(..), ColorEnv, DragComponentView(..), NumberComponentView(..), PositionUpdate, TextComponentView(..), InputTextValue, runExistsRow)
 import ColorPicker.Halogen.Layout as L
 import ColorPicker.Halogen.Utils.Drag as Drag
 import Control.Monad.Aff.Class (class MonadAff)
 import DOM.Classy.Event (preventDefault)
-import DOM.Event.Types (MouseEvent, TouchEvent)
 import Data.Array (index, mapWithIndex)
-import Data.Bifunctor (bimap)
-import Data.Either (Either(..), either, isLeft)
+import Data.Either (Either(..), either)
 import Data.Either.Nested as Either
-import Data.Foldable (foldMap, foldr, for_)
+import Data.Foldable (foldr, for_)
 import Data.Functor.Coproduct.Nested as Coproduct
 import Data.List as List
 import Data.Map (Map, insert, lookup)
-import Data.Maybe (Maybe(..), fromMaybe, maybe)
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Monoid (mempty)
 import Data.Traversable (sequence)
 import Halogen (liftEff)
@@ -46,7 +44,7 @@ import NumberInput.Halogen.Component as Num
 type ValueProgress a =  { current ∷ a, next ∷ a }
 type State =
   { color ∷ ValueProgress Color
-  , inputs ∷ Map Cursor (Either String String) -- Left is invalid, Right is valid
+  , inputValues ∷ Map Cursor InputTextValue
   , props ∷ Props
   }
 
@@ -85,6 +83,7 @@ data Query a
   | ComponentUpdate (Color → Maybe Color) a
   | NumberComponentUpdate Cursor (Maybe Number) a
   | TextComponentUpdate Cursor (String → Maybe Color) String a
+  | TextComponentBlur Cursor a
   | Commit a
   | Init a
   | GetValue (ValueProgress Color → a)
@@ -108,7 +107,7 @@ initialColor = Color.hsl 0.0 0.0 0.0
 
 picker ∷ ∀ m r. MonadAff (PickerEffects r) m ⇒ H.Component HH.HTML Query Props Message m
 picker = H.lifecycleParentComponent
-  { initialState: { color: { current: initialColor, next: initialColor }, inputs: mempty, props: _ }
+  { initialState: { color: { current: initialColor, next: initialColor }, inputValues: mempty, props: _ }
   , render
   , eval
   , receiver: HE.input SetProps
@@ -117,11 +116,11 @@ picker = H.lifecycleParentComponent
   }
 
 render ∷ ∀ m. State → HTML m
-render state@{ color, inputs, props} = renderLayout state List.Nil props.layout
+render state = renderLayout state List.Nil state.props.layout
 
 
 renderLayout ∷ ∀ m. State → Cursor → L.Layout → HTML m
-renderLayout state@{ color, inputs, props} cursor = case _ of
+renderLayout state@{ color, inputValues, props} cursor = case _ of
   L.Group classes l →
     HH.div
       [ HP.classes classes ]
@@ -153,13 +152,7 @@ renderLayout state@{ color, inputs, props} cursor = case _ of
           ]
           []
       ]
-  L.Component c → renderColorComponent state cursor c
-
-  where
-  hsv = Color.toHSVA $ color.next
-  colorEnv = calcColorEnv color.next
-  renderColorComponent ∷ State → Cursor → ColorComponent → HTML m
-  renderColorComponent { inputs, props } cursor = case _ of
+  L.Component c →  case c of
     DragComponentSpec spec →
       let
         run :: ∀ r. DragComponentView r -> HTML m
@@ -182,11 +175,14 @@ renderLayout state@{ color, inputs, props} cursor = case _ of
     TextComponentSpec spec →
       let
         run :: ∀ r. TextComponentView r -> HTML m
-        run (TextComponentView view) = view colorEnv val $
-          [ HE.onValueInput $ HE.input $ TextComponentUpdate cursor spec.fromString ]
-        val :: Either String String
-        val = maybe (Right $ spec.toString colorEnv) id $ lookup cursor inputs
+        run (TextComponentView view) = view colorEnv
+          (lookup cursor inputValues)
+          [ HE.onValueInput $ HE.input $ TextComponentUpdate cursor spec.fromString
+          , HE.onBlur $ HE.input_ $ TextComponentBlur cursor
+          ]
       in runExistsRow run spec.view
+  where
+  colorEnv = calcColorEnv color.next
 
 colorClasses ∷ Props → Color → Array HH.ClassName
 colorClasses props c = classesFor props $ if Color.isLight c then IsLight else IsDark
@@ -194,14 +190,19 @@ colorClasses props c = classesFor props $ if Color.isLight c then IsLight else I
 
 eval ∷ ∀ m r. MonadAff (PickerEffects r) m ⇒ Query ~> DSL m
 eval = case _ of
+  TextComponentBlur cursor next → do
+    state ← H.get
+    let val = lookup cursor state.inputValues
+    for_ (lookup cursor state.inputValues) \val ->
+      when val.isValid $ H.modify _ { inputValues = mempty :: Map Cursor InputTextValue }
+    pure next
   TextComponentUpdate cursor fromString str next → do
-    {props} ← H.get
     let
       color = fromString str
-      val = case color of
-        Nothing → Left str
-        Just _ → Right str
-    H.modify \s → s { inputs = insert cursor val s.inputs }
+      isValid = case color of
+        Nothing → false
+        Just _ → true
+    H.modify \s → s { inputValues = insert cursor {isValid, value: str} s.inputValues }
     eval $ ComponentUpdate (const color) next
   NumberComponentUpdate cursor num next → do
     { color, props } ← H.get
@@ -278,9 +279,8 @@ propagate = do
     L.Actions → pure unit
     L.Component c → case c of
       DragComponentSpec _ → pure unit
-      TextComponentSpec { toString } →
-        H.modify \s → s { inputs = insert cursor (Right $ toString colorEnv) s.inputs }
-      NumberComponentSpec { read} →
+      TextComponentSpec _ → pure unit
+      NumberComponentSpec { read } →
         H.query' cpNumComponent cursor (H.action $ Num.SetValue $ Just $ read colorEnv) >>= mustBeMounted
 
 mustBeMounted ∷ ∀ s f g p o m a. Maybe a → H.HalogenM s f g p o m a

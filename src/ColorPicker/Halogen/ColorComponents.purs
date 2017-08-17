@@ -1,7 +1,9 @@
 module ColorPicker.Halogen.ColorComponents
   ( ColorComponent(..)
+  , InputTextValue
+  , isValid
+  , isInvalid
   , Dynamic
-  , Styles
   , PreNumConf
   , PreTextConf
   , InputProps
@@ -36,15 +38,13 @@ module ColorPicker.Halogen.ColorComponents
 
 import Prelude
 
-import CSS (CSS)
 import CSS as CSS
 import Color (Color)
 import Color as Color
 import Control.MonadZero (guard)
-import DOM.Event.Types (Event, MouseEvent, TouchEvent)
-import Data.Either (Either, either, isLeft)
+import DOM.Event.Types (Event, FocusEvent, MouseEvent, TouchEvent)
 import Data.Int (floor, toNumber)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), isJust, maybe, maybe')
 import Data.String as String
 import Halogen (ClassName)
 import Halogen.HTML as HH
@@ -55,17 +55,14 @@ import NumberInput.Halogen.Component as Num
 import NumberInput.Range (Range(..))
 import Unsafe.Coerce (unsafeCoerce)
 
+
+type InputTextValue = { value ∷ String, isValid ∷ Boolean }
+
 type PositionUpdate = { x ∷ Number, y ∷ Number } → Dynamic Color
 
 type Dynamic s = ColorEnv → s
 
 type Classes = Array ClassName
-
--- TODO make sure all css and classes are used properly (hint: number input)
-type Styles =
-  { classes ∷ Classes
-  , css ∷ CSS
-  }
 
 type PreNumConf = { prefix ∷ String, title ∷ String, placeholder ∷ String, range ∷ Range Number }
 
@@ -97,7 +94,6 @@ data ColorComponent
     }
   | TextComponentSpec
     { fromString ∷ String → Maybe Color
-    , toString ∷ Dynamic String -- TODO remove to as in view we already ahve ColorEnv
     , view ∷ ExistsRow TextComponentView
     }
   | DragComponentSpec
@@ -116,8 +112,8 @@ newtype NumberComponentView = NumberComponentView
 newtype TextComponentView r = TextComponentView
   ( ∀ p i
   . ColorEnv
-  → Either String String -- TODO update to Maybe String (for invlaid strings)
-  → Array (HH.IProp (value :: String, onInput :: Event | r) i)
+  → Maybe InputTextValue
+  → Array (HH.IProp (value :: String, onInput :: Event, onBlur :: FocusEvent | r) i)
   → HH.HTML p i
   )
 
@@ -149,7 +145,7 @@ componentDragSV classes = DragComponentSpec
       HH.div
         ([ HP.classes $ classes.root <> if isLight then classes.isLight else classes.isDark
         , HCSS.style $ CSS.backgroundColor $ Color.hsl hsv.h 1.0 0.5
-        ] <> props) -- TODO error here
+        ] <> props)
         [ HH.div
           [ HP.classes classes.selector
           , HCSS.style do
@@ -244,8 +240,6 @@ mapInputProps f { root, label, elem, elemInvalid } =
   , elemInvalid: f elemInvalid
   }
 
-toDynamicStyles :: InputProps Classes -> InputProps (Dynamic Styles)
-toDynamicStyles = mapInputProps $ { classes: _, css: pure unit } >>> const
 
 componentValue ∷ InputProps Classes → ColorComponent
 componentValue classes = mkNumComponent
@@ -278,7 +272,6 @@ componentBlue classes = mkNumComponent
 componentHEX ∷ InputProps Classes → ColorComponent
 componentHEX classes = TextComponentSpec
   { fromString: \str → Color.fromHexString $ "#" <> str
-  , toString: \{color} → String.toUpper $ String.drop 1 $ Color.toHexString color
   , view: mkExistsRow $ TextComponentView \env val props -> renderInput
       { root: classes.root
       , label: classes.label
@@ -287,13 +280,22 @@ componentHEX classes = TextComponentSpec
           [ HP.type_ HP.InputText
           , HP.classes
             $  classes.elem
-            <> (guard (isLeft val) *> (classes.elemInvalid))
+            <> (guard (isInvalid val) *> (classes.elemInvalid))
           , HP.title "Hex"
-          , HP.value $ either id id val
+          , HP.value $ maybe' (\_ -> toString env) _.value val
           , HP.placeholder "Hex"
           ] <> props
       }
   }
+  where
+  toString =  \{color} → String.toUpper $ String.drop 1 $ Color.toHexString color
+
+
+isValid :: Maybe InputTextValue -> Boolean
+isValid = maybe true _.isValid
+
+isInvalid :: Maybe InputTextValue -> Boolean
+isInvalid = not isValid
 
 renderInput :: ∀ i p.
   { child :: HH.HTML i p
