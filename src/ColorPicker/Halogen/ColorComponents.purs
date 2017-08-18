@@ -12,7 +12,6 @@ module ColorPicker.Halogen.ColorComponents
   , RecordHSVA
   , RecordRGBA
   , PositionUpdate
-  , ColorEnv
   , componentHue
   , componentSaturationHSL
   , componentLightness
@@ -34,6 +33,8 @@ module ColorPicker.Halogen.ColorComponents
   , runExistsRow
   , TextComponentView(..)
   , NumberComponentView(..)
+  , mkLazyColor
+  , LazyColor
   ) where
 
 import Prelude
@@ -44,6 +45,7 @@ import Color as Color
 import Control.MonadZero (guard)
 import DOM.Event.Types (Event, FocusEvent, MouseEvent, TouchEvent)
 import Data.Int (floor, toNumber)
+import Data.Lazy (Lazy, defer, force)
 import Data.Maybe (Maybe(..), maybe, maybe')
 import Data.String as String
 import Halogen (ClassName)
@@ -60,7 +62,7 @@ type InputTextValue = { value ∷ String, isValid ∷ Boolean }
 
 type PositionUpdate = { x ∷ Number, y ∷ Number } → Dynamic Color
 
-type Dynamic s = ColorEnv → s
+type Dynamic s = LazyColor → s
 
 type Classes = Array ClassName
 
@@ -68,14 +70,24 @@ type PreNumConf = { prefix ∷ String, title ∷ String, placeholder ∷ String,
 
 type PreTextConf = { prefix ∷ String, title ∷ String, placeholder ∷ String }
 
--- TODO add Lazy
-type ColorEnv =
-  { hsl ∷ RecordHSLA
-  , hsv ∷ RecordHSVA
-  , rgb ∷ RecordRGBA
-  , isLight ∷ Boolean
-  , color ∷ Color
+
+type LazyColor =
+  { color :: Color
+  , hsl :: Lazy RecordHSLA
+  , hsv :: Lazy RecordHSVA
+  , rgb :: Lazy RecordRGBA
+  , isLight :: Lazy Boolean
   }
+
+mkLazyColor :: Color -> LazyColor
+mkLazyColor color =
+  { color
+  , hsl: defer \_ -> Color.toHSLA color
+  , hsv: defer \_ -> Color.toHSVA color
+  , rgb: defer \_ -> Color.toRGBA color
+  , isLight: defer \_ -> Color.isLight color
+  }
+
 
 type InputProps c =
   { root ∷ c
@@ -104,14 +116,14 @@ data ColorComponent
 
 newtype NumberComponentView = NumberComponentView
   ( ∀ p i
-  . ColorEnv
+  . LazyColor
   → HH.HTML p i
   → HH.HTML p i
   )
 
 newtype TextComponentView r = TextComponentView
   ( ∀ p i
-  . ColorEnv
+  . LazyColor
   → Maybe InputTextValue
   → Array (HH.IProp (value :: String, onInput :: Event, onBlur :: FocusEvent | r) i)
   → HH.HTML p i
@@ -119,7 +131,7 @@ newtype TextComponentView r = TextComponentView
 
 newtype DragComponentView r = DragComponentView
   ( ∀ p i
-  . ColorEnv
+  . LazyColor
   → Array (HH.IProp (onMouseDown :: MouseEvent, onTouchStart :: TouchEvent | r) i)
   → HH.HTML p i
   )
@@ -143,14 +155,14 @@ componentDragSV classes = DragComponentSpec
   { update: \{x, y} → modifyHSV _{ s = x, v = 1.0 - y}
   , view: mkExistsRow $ DragComponentView \{isLight, hsv, color} props ->
       HH.div
-        ([ HP.classes $ classes.root <> if isLight then classes.isLight else classes.isDark
-        , HCSS.style $ CSS.backgroundColor $ Color.hsl hsv.h 1.0 0.5
+        ([ HP.classes $ classes.root <> if (force isLight) then classes.isLight else classes.isDark
+        , HCSS.style $ CSS.backgroundColor $ Color.hsl (force hsv).h 1.0 0.5
         ] <> props)
         [ HH.div
           [ HP.classes classes.selector
           , HCSS.style do
-              CSS.left $ CSS.pct (hsv.s * 100.0)
-              CSS.bottom $ CSS.pct (hsv.v * 100.0)
+              CSS.left $ CSS.pct ((force hsv).s * 100.0)
+              CSS.bottom $ CSS.pct ((force hsv).v * 100.0)
               CSS.backgroundColor color
           ]
           []
@@ -170,7 +182,7 @@ componentDragHue classes = DragComponentSpec
         ([ HP.classes classes.root ] <> props)
         [ HH.div
           [ HP.classes classes.selector
-          , HCSS.style $ CSS.top $ CSS.pct ((1.0 - hsv.h / 360.0) * 100.0)
+          , HCSS.style $ CSS.top $ CSS.pct ((1.0 - (force hsv).h / 360.0) * 100.0)
           ]
           []
         ]
@@ -206,7 +218,7 @@ mkNumComponent update read classes conf = NumberComponentSpec
 componentHue ∷ InputProps Classes → ColorComponent
 componentHue classes = mkNumComponent
   (\n → Just <<< modifyHSL (_{h = n}))
-  (\({rgb, hsv, hsl}) → roundFractionalNum hsl.h)
+  (\({rgb, hsv, hsl}) → roundFractionalNum (force hsl).h)
   classes
   confHue
 
@@ -214,21 +226,21 @@ componentHue classes = mkNumComponent
 componentSaturationHSL ∷ InputProps Classes → ColorComponent
 componentSaturationHSL classes = mkNumComponent
   (\n → Just <<< modifyHSL (_{s = n / 100.0}))
-  (\({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * hsl.s)
+  (\({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * (force hsl).s)
   classes
   confSaturation
 
 componentLightness ∷ InputProps Classes → ColorComponent
 componentLightness classes = mkNumComponent
   (\n → Just <<< modifyHSL (_{l = n / 100.0}))
-  (\({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * hsl.l)
+  (\({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * (force hsl).l)
   classes
   confLightness
 
 componentSaturationHSV ∷ InputProps Classes → ColorComponent
 componentSaturationHSV classes = mkNumComponent
   (\n → Just <<< modifyHSV (_{s = n / 100.0}))
-  (\({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * hsv.s)
+  (\({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * (force hsv).s)
   classes
   confSaturation
 
@@ -244,28 +256,28 @@ mapInputProps f { root, label, elem, elemInvalid } =
 componentValue ∷ InputProps Classes → ColorComponent
 componentValue classes = mkNumComponent
   (\n → Just <<< modifyHSV (_{v = n / 100.0}))
-  (\({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * hsv.v)
+  (\({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * (force hsv).v)
   classes
   confValue
 
 componentRed ∷ InputProps Classes → ColorComponent
 componentRed classes = mkNumComponent
   (\n → Just <<< modifyRGB (_{r = asInt n}))
-  (\({rgb, hsv, hsl}) → roundNum $ toNumber rgb.r)
+  (\({rgb, hsv, hsl}) → roundNum $ toNumber (force rgb).r)
   classes
   confRed
 
 componentGreen ∷ InputProps Classes → ColorComponent
 componentGreen classes = mkNumComponent
   (\n → Just <<< modifyRGB (_{g = asInt n}))
-  (\({rgb, hsv, hsl}) → roundNum $ toNumber rgb.g)
+  (\({rgb, hsv, hsl}) → roundNum $ toNumber (force rgb).g)
   classes
   confGreen
 
 componentBlue ∷ InputProps Classes → ColorComponent
 componentBlue classes = mkNumComponent
   (\n → Just <<< modifyRGB (_{b = asInt n}))
-  (\({rgb, hsv, hsl}) → roundNum $ toNumber rgb.b)
+  (\({rgb, hsv, hsl}) → roundNum $ toNumber (force rgb).b)
   classes
   confBlue
 
@@ -403,10 +415,10 @@ type RecordHSVA = { h ∷ Number, s ∷ Number, v ∷ Number, a ∷ Number }
 type RecordRGBA = { r ∷ Int, g ∷ Int, b ∷ Int, a ∷ Number }
 
 modifyHSL ∷ (RecordHSLA → RecordHSLA) → Dynamic Color
-modifyHSL f { hsl } = let {h, s, l, a} = f hsl in Color.hsla h s l a
+modifyHSL f { hsl } = let {h, s, l, a} = f (force hsl) in Color.hsla h s l a
 
 modifyHSV ∷ (RecordHSVA → RecordHSVA) → Dynamic Color
-modifyHSV f { hsv } = let {h, s, v, a} = f hsv in Color.hsva h s v a
+modifyHSV f { hsv } = let {h, s, v, a} = f (force hsv) in Color.hsva h s v a
 
 modifyRGB ∷ (RecordRGBA → RecordRGBA) → Dynamic Color
-modifyRGB f { rgb } = let {r, g, b, a} = f rgb in Color.rgba r g b a
+modifyRGB f { rgb } = let {r, g, b, a} = f (force rgb) in Color.rgba r g b a

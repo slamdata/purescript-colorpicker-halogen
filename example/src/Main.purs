@@ -161,8 +161,6 @@ mkConf reverse' root editGroups =
     , Tuple CPicker.ColorBlockOld [ ClassName "ColorPicker-colorBlockOld" ]
     , Tuple CPicker.Actions [ ClassName "ColorPicker-actions" ]
     , Tuple CPicker.ActionSet [ ClassName "ColorPicker-actionSet" ]
-    , Tuple CPicker.IsLight [ ClassName "IsLight" ]
-    , Tuple CPicker.IsDark [ ClassName "IsDark" ]
     ]
   }
 

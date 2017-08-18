@@ -5,8 +5,6 @@ module ColorPicker.Halogen.Component
   , Message(..)
   , Props
   , ClassGroup(..)
-  , ColorComponentGroups
-  , ColorComponents
   , PickerEffects
   )
   where
@@ -16,12 +14,12 @@ import Prelude
 import CSS as CSS
 import Color (Color)
 import Color as Color
-import ColorPicker.Halogen.ColorComponents (ColorComponent(..), ColorEnv, DragComponentView(..), NumberComponentView(..), PositionUpdate, TextComponentView(..), InputTextValue, runExistsRow)
+import ColorPicker.Halogen.ColorComponents (ColorComponent(..), DragComponentView(..), InputTextValue, LazyColor, NumberComponentView(..), PositionUpdate, TextComponentView(..), mkLazyColor, runExistsRow)
 import ColorPicker.Halogen.Layout as L
 import ColorPicker.Halogen.Utils.Drag as Drag
 import Control.Monad.Aff.Class (class MonadAff)
 import DOM.Classy.Event (preventDefault)
-import Data.Array (head, index, mapWithIndex, nub, take)
+import Data.Array (head, index, mapWithIndex, nubBy, take)
 import Data.Either (Either(..), either)
 import Data.Either.Nested as Either
 import Data.Foldable (foldr, for_)
@@ -43,16 +41,12 @@ import NumberInput.Halogen.Component as Num
 
 type ValueHistory a =  { old ∷ Array a, current ∷ a }
 type State =
-  { color ∷ ValueHistory Color
+  { color ∷ ValueHistory LazyColor
   , inputValues ∷ Map Cursor InputTextValue
   , props ∷ Props
   }
 
 data Message = NextChange Color | NotifyChange Color
-
-
-type ColorComponentGroups = Array ColorComponents
-type ColorComponents = Array ColorComponent
 
 classesFor ∷ Props → ClassGroup → Array HH.ClassName
 classesFor {classes} key = fromMaybe [] $ lookup key classes
@@ -63,8 +57,6 @@ data ClassGroup
   | ColorBlockOld
   | Actions
   | ActionSet
-  | IsLight
-  | IsDark
 
 derive instance classGroupEq ∷ Eq ClassGroup
 derive instance classGroupOrd ∷ Ord ClassGroup
@@ -86,8 +78,8 @@ data Query a
   | TextComponentBlur Cursor a
   | Commit a
   | Init a
-  | GetValue (ValueHistory Color → a)
-  | SetValue (ValueHistory Color) a
+  | GetValue (ValueHistory LazyColor → a) -- TODO make ValueHistory and use normal Color here
+  | SetValue (ValueHistory LazyColor) a
 
 type ChildQuery = Coproduct.Coproduct1 (Num.Query Number)
 type Slot = Either.Either1 Cursor
@@ -108,7 +100,7 @@ initialColor = Color.hsl 0.0 0.0 0.0
 picker ∷ ∀ m r. MonadAff (PickerEffects r) m ⇒ H.Component HH.HTML Query Props Message m
 picker = H.lifecycleParentComponent
   { initialState:
-      { color: { current: initialColor, old: [] }
+      { color: { current: mkLazyColor initialColor, old: [] }
       , inputValues: mempty
       , props: _ }
   , render
@@ -140,18 +132,18 @@ renderLayout state@{ color, inputValues, props} cursor = case _ of
   L.Stage →
     let
       current = HH.div
-        [ HP.classes $ classesFor props ColorBlockCurrent <> colorClasses props color.current
+        [ HP.classes $ classesFor props ColorBlockCurrent
         , HP.title "Current value"
-        , HCSS.style $ CSS.backgroundColor color.current
+        , HCSS.style $ CSS.backgroundColor color.current.color
         ] []
 
       old = take 4 color.old <#> \c ->
         HH.div
           [ HP.tabIndex 0
-          , HP.classes $ classesFor props ColorBlockOld <> colorClasses props c
+          , HP.classes $ classesFor props ColorBlockOld
           , HP.title "Old value"
-          , HE.onClick $ HE.input (\_ → ComponentUpdate $ const $ Just c)
-          , HCSS.style $ CSS.backgroundColor c
+          , HE.onClick $ HE.input (\_ → ComponentUpdate $ const $ Just c.color)
+          , HCSS.style $ CSS.backgroundColor c.color
           ] []
     in
       HH.div
@@ -161,7 +153,7 @@ renderLayout state@{ color, inputValues, props} cursor = case _ of
     DragComponentSpec spec →
       let
         run :: ∀ r. DragComponentView r -> HTML m
-        run (DragComponentView view) = view colorEnv $
+        run (DragComponentView view) = view color.current $
           [ HE.onMouseDown $ HE.input (Left >>> DragStart spec.update)
           , HE.onTouchStart $ HE.input (Right >>> DragStart spec.update)
           ]
@@ -170,7 +162,7 @@ renderLayout state@{ color, inputValues, props} cursor = case _ of
       let
         NumberComponentView view = spec.view
       in
-        view colorEnv $
+        view color.current $
           HH.slot'
             cpNumComponent
             cursor
@@ -180,17 +172,12 @@ renderLayout state@{ color, inputValues, props} cursor = case _ of
     TextComponentSpec spec →
       let
         run :: ∀ r. TextComponentView r -> HTML m
-        run (TextComponentView view) = view colorEnv
+        run (TextComponentView view) = view color.current
           (lookup cursor inputValues)
           [ HE.onValueInput $ HE.input $ TextComponentUpdate cursor spec.fromString
           , HE.onBlur $ HE.input_ $ TextComponentBlur cursor
           ]
       in runExistsRow run spec.view
-  where
-  colorEnv = calcColorEnv color.current
-
-colorClasses ∷ Props → Color → Array HH.ClassName
-colorClasses props c = classesFor props $ if Color.isLight c then IsLight else IsDark
 
 
 eval ∷ ∀ m r. MonadAff (PickerEffects r) m ⇒ Query ~> DSL m
@@ -214,7 +201,7 @@ eval = case _ of
     case focus cursor props.layout of
       Just (L.Component (NumberComponentSpec { update })) → eval $
        ComponentUpdate
-        (\_ → update <$> num >>= (_ $ calcColorEnv color.current))
+        (\_ → update <$> num >>= (_ $ color.current))
         next
       _ → pure next
   SetValue val next → do
@@ -228,16 +215,16 @@ eval = case _ of
   Commit next → do
     state ← H.get
     -- TODO disable Commit button if this condition is not true
-    when (Just state.color.current /= head state.color.old) do
+    when (Just state.color.current.color /= (map _.color $ head state.color.old)) do
       H.put $ state{ color =
         { current: state.color.current
-        , old: nub $ [state.color.current] <> state.color.old
+        , old: nubBy (\a b -> eq a.color b.color) $ [state.color.current] <> state.color.old
         }}
-      H.raise $ NotifyChange state.color.current
+      H.raise $ NotifyChange state.color.current.color
     pure next
   ComponentUpdate update next → do
     state ← H.get
-    for_ (update state.color.current) $ \color' → do
+    for_ (update state.color.current.color) $ \color' → do
       updateColor state $ color'
     pure next
   SetProps props next → do
@@ -247,7 +234,7 @@ eval = case _ of
     case drag of
       Drag.Move event dragData → do
         state ← H.get
-        updateColor state $ update dragData.progress (calcColorEnv state.color.current)
+        updateColor state $ update dragData.progress state.color.current
         pure unit
       Drag.Done event → pure unit
     pure next
@@ -260,38 +247,29 @@ eval = case _ of
 
 updateColor ∷ ∀ m. State → Color → DSL m Unit
 updateColor state colorNext = do
-  H.put state{ color { current = colorNext } }
+  H.put state{ color { current = mkLazyColor colorNext } }
   H.raise $ NextChange colorNext
   propagate
 
-
-calcColorEnv ∷ Color → ColorEnv
-calcColorEnv color =
-  { hsl: Color.toHSLA color
-  , hsv: Color.toHSVA color
-  , rgb: Color.toRGBA color
-  , isLight: Color.isLight color
-  , color: color
-  }
 
 propagate ∷ ∀ m. DSL m Unit
 propagate = do
   { color, props: { layout }} ← H.get
   propagateLayout
-    (calcColorEnv color.current)
+    color.current
     List.Nil
     layout
   where
-  propagateLayout ∷ ColorEnv → Cursor → L.Layout → DSL m Unit
-  propagateLayout colorEnv cursor = case _ of
-    L.Group _ l → void $ sequence $ mapWithIndex (\idx → propagateLayout colorEnv (List.Cons idx cursor)) l
+  propagateLayout ∷ LazyColor → Cursor → L.Layout → DSL m Unit
+  propagateLayout color cursor = case _ of
+    L.Group _ l → void $ sequence $ mapWithIndex (\idx → propagateLayout color (List.Cons idx cursor)) l
     L.Stage → pure unit
     L.Actions → pure unit
     L.Component c → case c of
       DragComponentSpec _ → pure unit
       TextComponentSpec _ → pure unit
       NumberComponentSpec { read } →
-        H.query' cpNumComponent cursor (H.action $ Num.SetValue $ Just $ read colorEnv) >>= mustBeMounted
+        H.query' cpNumComponent cursor (H.action $ Num.SetValue $ Just $ read color) >>= mustBeMounted
 
 mustBeMounted ∷ ∀ s f g p o m a. Maybe a → H.HalogenM s f g p o m a
 mustBeMounted (Just x) = pure x
