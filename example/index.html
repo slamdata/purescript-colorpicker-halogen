@@ -82,26 +82,35 @@ body {
 .ColorPicker-stage {
   display: flex;
   margin: 0.2em;
+  box-shadow: 0 0 0 1px black inset, 0 0 0 2px white inset;
+  padding: 1px 2px 1px 1px;
 }
 
-.ColorPicker-colorBlockNext,
-.ColorPicker-colorBlockCurrent {
-  border-top: 0.1em solid;
-  border-bottom: 0.1em solid;
-  flex: 1 1 0%;
+.ColorPicker-colorBlockCurrent,
+.ColorPicker-colorBlockOld {
   height: 1.5em;
+  box-sizing: border-box;
 }
 
-.ColorPicker-colorBlockNext {
-  border-left: 0.1em solid;
+.ColorPicker-colorBlockCurrent:not(:only-child) {
+  box-shadow: 0px 0 0 1px black;
+  margin-right: 1px;
+  border-right-width: 0.05em;
 }
-
 .ColorPicker-colorBlockCurrent {
-  border-right: 0.1em solid;
+  border: 0.05em solid white;
+  border-right-width: 0;
+  flex: 2 1 0%;
+}
+
+.ColorPicker-colorBlockOld {
+  flex: 1 1 0%;
+  border-top: 1px solid white;
+  border-bottom: 1px solid white;
   cursor: pointer;
 }
 
-.ColorPicker-colorBlockPrevious:focus {
+.ColorPicker-ColorBlockOld:focus {
   outline: -webkit-focus-ring-color auto 5px;
 }
 

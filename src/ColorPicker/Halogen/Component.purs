@@ -1,7 +1,7 @@
 module ColorPicker.Halogen.Component
   ( picker
   , Query(GetValue, SetValue, Commit)
-  , ValueProgress
+  , ValueHistory
   , Message(..)
   , Props
   , ClassGroup(..)
@@ -21,7 +21,7 @@ import ColorPicker.Halogen.Layout as L
 import ColorPicker.Halogen.Utils.Drag as Drag
 import Control.Monad.Aff.Class (class MonadAff)
 import DOM.Classy.Event (preventDefault)
-import Data.Array (index, mapWithIndex)
+import Data.Array (head, index, mapWithIndex, nub, take)
 import Data.Either (Either(..), either)
 import Data.Either.Nested as Either
 import Data.Foldable (foldr, for_)
@@ -41,9 +41,9 @@ import Halogen.HTML.Properties as HP
 import Halogen.Query.HalogenM (halt)
 import NumberInput.Halogen.Component as Num
 
-type ValueProgress a =  { current ∷ a, next ∷ a }
+type ValueHistory a =  { old ∷ Array a, current ∷ a }
 type State =
-  { color ∷ ValueProgress Color
+  { color ∷ ValueHistory Color
   , inputValues ∷ Map Cursor InputTextValue
   , props ∷ Props
   }
@@ -60,7 +60,7 @@ classesFor {classes} key = fromMaybe [] $ lookup key classes
 data ClassGroup
   = Stage
   | ColorBlockCurrent
-  | ColorBlockNext
+  | ColorBlockOld
   | Actions
   | ActionSet
   | IsLight
@@ -86,8 +86,8 @@ data Query a
   | TextComponentBlur Cursor a
   | Commit a
   | Init a
-  | GetValue (ValueProgress Color → a)
-  | SetValue (ValueProgress Color) a
+  | GetValue (ValueHistory Color → a)
+  | SetValue (ValueHistory Color) a
 
 type ChildQuery = Coproduct.Coproduct1 (Num.Query Number)
 type Slot = Either.Either1 Cursor
@@ -108,7 +108,7 @@ initialColor = Color.hsl 0.0 0.0 0.0
 picker ∷ ∀ m r. MonadAff (PickerEffects r) m ⇒ H.Component HH.HTML Query Props Message m
 picker = H.lifecycleParentComponent
   { initialState:
-      { color: { current: initialColor, next: initialColor }
+      { color: { current: initialColor, old: [] }
       , inputValues: mempty
       , props: _ }
   , render
@@ -138,23 +138,25 @@ renderLayout state@{ color, inputValues, props} cursor = case _ of
           [ HH.text "Set" ]
       ]
   L.Stage →
-    HH.div
-      [ HP.classes $ props `classesFor` Stage ]
-      [ HH.div
-          [ HP.classes $ classesFor props ColorBlockNext <> colorClasses props color.next
-          , HP.title "Next value"
-          , HCSS.style $ CSS.backgroundColor color.next
-          ]
-          []
-      , HH.div
+    let
+      current = HH.div
+        [ HP.classes $ classesFor props ColorBlockCurrent <> colorClasses props color.current
+        , HP.title "Current value"
+        , HCSS.style $ CSS.backgroundColor color.current
+        ] []
+
+      old = take 4 color.old <#> \c ->
+        HH.div
           [ HP.tabIndex 0
-          , HP.classes $ classesFor props ColorBlockCurrent <> colorClasses props color.current
-          , HP.title "Current value"
-          , HE.onClick $ HE.input (\_ → ComponentUpdate $ const $ Just color.current)
-          , HCSS.style $ CSS.backgroundColor color.current
-          ]
-          []
-      ]
+          , HP.classes $ classesFor props ColorBlockOld <> colorClasses props c
+          , HP.title "Old value"
+          , HE.onClick $ HE.input (\_ → ComponentUpdate $ const $ Just c)
+          , HCSS.style $ CSS.backgroundColor c
+          ] []
+    in
+      HH.div
+        [ HP.classes $ props `classesFor` Stage ] $
+        [ current ] <> old
   L.Component c →  case c of
     DragComponentSpec spec →
       let
@@ -185,7 +187,7 @@ renderLayout state@{ color, inputValues, props} cursor = case _ of
           ]
       in runExistsRow run spec.view
   where
-  colorEnv = calcColorEnv color.next
+  colorEnv = calcColorEnv color.current
 
 colorClasses ∷ Props → Color → Array HH.ClassName
 colorClasses props c = classesFor props $ if Color.isLight c then IsLight else IsDark
@@ -212,7 +214,7 @@ eval = case _ of
     case focus cursor props.layout of
       Just (L.Component (NumberComponentSpec { update })) → eval $
        ComponentUpdate
-        (\_ → update <$> num >>= (_ $ calcColorEnv color.next))
+        (\_ → update <$> num >>= (_ $ calcColorEnv color.current))
         next
       _ → pure next
   SetValue val next → do
@@ -225,12 +227,17 @@ eval = case _ of
     pure next
   Commit next → do
     state ← H.get
-    H.put $ state{ color {current = state.color.next, next = state.color.next} }
-    H.raise $ NotifyChange state.color.next
+    -- TODO disable Commit button if this condition is not true
+    when (Just state.color.current /= head state.color.old) do
+      H.put $ state{ color =
+        { current: state.color.current
+        , old: nub $ [state.color.current] <> state.color.old
+        }}
+      H.raise $ NotifyChange state.color.current
     pure next
   ComponentUpdate update next → do
     state ← H.get
-    for_ (update state.color.next) $ \color' → do
+    for_ (update state.color.current) $ \color' → do
       updateColor state $ color'
     pure next
   SetProps props next → do
@@ -240,7 +247,7 @@ eval = case _ of
     case drag of
       Drag.Move event dragData → do
         state ← H.get
-        updateColor state $ update dragData.progress (calcColorEnv state.color.next)
+        updateColor state $ update dragData.progress (calcColorEnv state.color.current)
         pure unit
       Drag.Done event → pure unit
     pure next
@@ -253,7 +260,7 @@ eval = case _ of
 
 updateColor ∷ ∀ m. State → Color → DSL m Unit
 updateColor state colorNext = do
-  H.put state{ color { next = colorNext } }
+  H.put state{ color { current = colorNext } }
   H.raise $ NextChange colorNext
   propagate
 
@@ -271,7 +278,7 @@ propagate ∷ ∀ m. DSL m Unit
 propagate = do
   { color, props: { layout }} ← H.get
   propagateLayout
-    (calcColorEnv color.next)
+    (calcColorEnv color.current)
     List.Nil
     layout
   where

@@ -158,7 +158,7 @@ mkConf reverse' root editGroups =
   , classes: fromFoldable
     [ Tuple CPicker.Stage [ ClassName "ColorPicker-stage" ]
     , Tuple CPicker.ColorBlockCurrent [ ClassName "ColorPicker-colorBlockCurrent" ]
-    , Tuple CPicker.ColorBlockNext [ ClassName "ColorPicker-colorBlockNext" ]
+    , Tuple CPicker.ColorBlockOld [ ClassName "ColorPicker-colorBlockOld" ]
     , Tuple CPicker.Actions [ ClassName "ColorPicker-actions" ]
     , Tuple CPicker.ActionSet [ ClassName "ColorPicker-actionSet" ]
     , Tuple CPicker.IsLight [ ClassName "IsLight" ]
