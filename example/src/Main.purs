@@ -14,7 +14,6 @@ import Data.Functor.Coproduct.Nested as Coproduct
 import Data.Map (Map, insert, lookup)
 import Data.Maybe (Maybe(..), maybe')
 import Data.Monoid (mempty)
-import Halogen (ClassName(..))
 import Halogen as H
 import Halogen.Aff as HA
 import Halogen.Component.ChildPath as CP
@@ -82,17 +81,19 @@ eval (HandleMsg idx msg next) = do
       _, CPicker.NotifyChange x →  {next: x, current: x}
 
 config0 ∷ CPicker.Props
-config0 = mkConf reverse
-  (ClassName "ColorPicker--small")
-  [ [ L.componentHue
-    , L.componentSaturationHSL
-    , L.componentLightness
+config0 = mkConf $ L.Root c $ reverse l
+  where
+  L.Root c l = mkLayout
+    (H.ClassName "ColorPicker--small")
+    [ [ L.componentHue
+      , L.componentSaturationHSL
+      , L.componentLightness
+      ]
     ]
-  ]
 
 config1 ∷ CPicker.Props
-config1 = mkConf id
-  (ClassName "ColorPicker--large")
+config1 = mkConf $ mkLayout
+  (H.ClassName "ColorPicker--large")
   [ [ L.componentHue
     , L.componentSaturationHSV
     , L.componentValue
@@ -107,8 +108,8 @@ config1 = mkConf id
   ]
 
 config2 ∷ CPicker.Props
-config2 = mkConf id
-  (ClassName "ColorPicker--small")
+config2 = mkConf $ mkLayout
+  (H.ClassName "ColorPicker--small")
   [ [ const componentRedORNoRed ]]
 
 componentRedORNoRed ∷ L.ColorComponent
@@ -136,47 +137,45 @@ componentRedORNoRed = L.TextComponentSpec
   toString =  \{color} → if color == red then "red" else "noRed"
 
 
+mkConf :: L.Layout -> CPicker.Props
+mkConf = { layout: _ }
 
-
-mkConf
-  ∷ (∀ a. Array a → Array a)
-  → ClassName
+mkLayout
+  ∷ H.ClassName
   → Array (Array (L.InputProps L.Classes → L.ColorComponent))
-  → CPicker.Props
-mkConf reverse' root editGroups =
-  { layout:
-    L.Root [ ClassName "ColorPicker", root ] $ reverse'
-      [ [ ClassName "ColorPicker-dragger" ] `L.Group`
-          [ L.Component $ L.componentDragSV
-              { root: [ ClassName "ColorPicker-field" ]
-              , isLight: [ ClassName "IsLight" ]
-              , isDark: [ ClassName "IsDark" ]
-              , selector: [ ClassName "ColorPicker-fieldSelector"]
-              }
-          , L.Component $ L.componentDragHue
-              { root: [ ClassName "ColorPicker-slider" ]
-              , selector: [ ClassName "ColorPicker-sliderSelector"]
-              }
-          ]
-      , [ ClassName "ColorPicker-aside" ] `L.Group`
-          [ [ ClassName "ColorPicker-stage" ] `L.Group`
-              [ L.Component $ L.componentPreview [ ClassName "ColorPicker-colorBlockCurrent" ]
-              , L.Component $ L.componentHistory [ ClassName "ColorPicker-colorBlockOld" ]
-              ]
-          , L.Group [ ClassName "ColorPicker-editing" ] $
-              editGroups <#> \editGroup →
-                L.Group [ ClassName "ColorPicker-editingItem" ] $
-                  editGroup <#> \mkItem -> L.Component $ mkItem inputClasses
-          , [ ClassName "ColorPicker-actions" ] `L.Group`
-              [ L.Component $ L.componentSet [ ClassName "ColorPicker-actionSet" ] ]
-          ]
-      ]
-  }
+  → L.Layout
+mkLayout root editGroups =
+  [ H.ClassName "ColorPicker", root ] `L.Root`
+    [ [ H.ClassName "ColorPicker-dragger" ] `L.Group`
+        [ L.Component $ L.componentDragSV
+            { root: [ H.ClassName "ColorPicker-field" ]
+            , isLight: [ H.ClassName "IsLight" ]
+            , isDark: [ H.ClassName "IsDark" ]
+            , selector: [ H.ClassName "ColorPicker-fieldSelector"]
+            }
+        , L.Component $ L.componentDragHue
+            { root: [ H.ClassName "ColorPicker-slider" ]
+            , selector: [ H.ClassName "ColorPicker-sliderSelector"]
+            }
+        ]
+    , [ H.ClassName "ColorPicker-aside" ] `L.Group`
+        [ [ H.ClassName "ColorPicker-stage" ] `L.Group`
+            [ L.Component $ L.componentPreview [ H.ClassName "ColorPicker-colorBlockCurrent" ]
+            , L.Component $ L.componentHistory [ H.ClassName "ColorPicker-colorBlockOld" ]
+            ]
+        , L.Group [ H.ClassName "ColorPicker-editing" ] $
+            editGroups <#> \editGroup →
+              L.Group [ H.ClassName "ColorPicker-editingItem" ] $
+                editGroup <#> \mkItem -> L.Component $ mkItem inputClasses
+        , [ H.ClassName "ColorPicker-actions" ] `L.Group`
+            [ L.Component $ L.componentSet [ H.ClassName "ColorPicker-actionSet" ] ]
+        ]
+    ]
 
 inputClasses ∷ L.InputProps L.Classes
 inputClasses =
-  { root: [ClassName "ColorPicker-input"]
-  , label: [ClassName "ColorPicker-inputLabel"]
-  , elem: [ClassName "ColorPicker-inputElem"]
-  , elemInvalid: [ClassName "ColorPicker-inputElem--invalid"]
+  { root: [H.ClassName "ColorPicker-input"]
+  , label: [H.ClassName "ColorPicker-inputLabel"]
+  , elem: [H.ClassName "ColorPicker-inputElem"]
+  , elemInvalid: [H.ClassName "ColorPicker-inputElem--invalid"]
   }
