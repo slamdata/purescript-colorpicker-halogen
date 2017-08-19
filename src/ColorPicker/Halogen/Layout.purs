@@ -4,9 +4,8 @@ module ColorPicker.Halogen.Layout where
 import ColorPicker.Halogen.ColorComponents (ColorComponent)
 import Halogen (ClassName)
 
-data Layout
-  = Group (Array ClassName) (Array Layout)
+data Layout = Root (Array ClassName) (Array ChildLayout)
+
+data ChildLayout
+  = Group (Array ClassName) (Array ChildLayout)
   | Component ColorComponent
-  -- TODO remove this Stage and Actions variants they could be expressed using some ButtonComponents
-  | Stage
-  | Actions

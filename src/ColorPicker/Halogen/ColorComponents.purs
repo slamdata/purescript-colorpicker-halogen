@@ -35,6 +35,10 @@ module ColorPicker.Halogen.ColorComponents
   , NumberComponentView(..)
   , mkLazyColor
   , LazyColor
+  , ValueHistory
+  , componentPreview
+  , componentHistory
+  , componentSet
   ) where
 
 import Prelude
@@ -44,13 +48,15 @@ import Color (Color)
 import Color as Color
 import Control.MonadZero (guard)
 import DOM.Event.Types (Event, FocusEvent, MouseEvent, TouchEvent)
+import Data.Array (take)
 import Data.Int (floor, toNumber)
 import Data.Lazy (Lazy, defer, force)
 import Data.Maybe (Maybe(..), maybe, maybe')
 import Data.String as String
-import Halogen (ClassName)
+import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.CSS as HCSS
+import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Math (round)
 import NumberInput.Halogen.Component as Num
@@ -58,13 +64,15 @@ import NumberInput.Range (Range(..))
 import Unsafe.Coerce (unsafeCoerce)
 
 
+type ValueHistory a =  { old ∷ Array a, current ∷ a }
+
 type InputTextValue = { value ∷ String, isValid ∷ Boolean }
 
 type PositionUpdate = { x ∷ Number, y ∷ Number } → Dynamic Color
 
 type Dynamic s = LazyColor → s
 
-type Classes = Array ClassName
+type Classes = Array H.ClassName
 
 type PreNumConf = { prefix ∷ String, title ∷ String, placeholder ∷ String, range ∷ Range Number }
 
@@ -112,13 +120,21 @@ data ColorComponent
     { update ∷ PositionUpdate
     , view ∷ ExistsRow DragComponentView
     }
+  | ActionComponentSpec
+    ( ∀ p i
+    . { color ∷ ValueHistory LazyColor
+      , setColor ∷ Color → i
+      , commit ∷ i
+      }
+    → Array (HH.HTML p i)
+    )
 
 
 newtype NumberComponentView = NumberComponentView
   ( ∀ p i
   . LazyColor
   → HH.HTML p i
-  → HH.HTML p i
+  → Array (HH.HTML p i)
   )
 
 newtype TextComponentView r = TextComponentView
@@ -126,14 +142,14 @@ newtype TextComponentView r = TextComponentView
   . LazyColor
   → Maybe InputTextValue
   → Array (HH.IProp (value :: String, onInput :: Event, onBlur :: FocusEvent | r) i)
-  → HH.HTML p i
+  → Array (HH.HTML p i)
   )
 
 newtype DragComponentView r = DragComponentView
   ( ∀ p i
   . LazyColor
   → Array (HH.IProp (onMouseDown :: MouseEvent, onTouchStart :: TouchEvent | r) i)
-  → HH.HTML p i
+  → Array (HH.HTML p i)
   )
 
 foreign import data ExistsRow :: (# Type -> Type) -> Type
@@ -144,16 +160,45 @@ mkExistsRow = unsafeCoerce
 runExistsRow :: ∀ f a. (∀ r. f r -> a) -> ExistsRow f -> a
 runExistsRow = unsafeCoerce
 
+
+componentPreview ∷ Array H.ClassName -> ColorComponent
+componentPreview classes = ActionComponentSpec \{ color , setColor } → pure $
+  HH.div
+    [ HP.classes $ classes
+    , HP.title "Current value"
+    , HCSS.style $ CSS.backgroundColor color.current.color
+    ] []
+
+componentHistory ∷ Array H.ClassName -> ColorComponent
+componentHistory classes = ActionComponentSpec \{ color , setColor } →
+  take 4 color.old <#> \c ->
+    HH.div
+      [ HP.tabIndex 0
+      , HP.classes $ classes
+      , HP.title "Old value"
+      , HE.onClick $ (\_ → Just $ setColor c.color)
+      , HCSS.style $ CSS.backgroundColor c.color
+      ] []
+
+
+componentSet ∷ Array H.ClassName -> ColorComponent
+componentSet classes = ActionComponentSpec \{ commit } → pure $
+  HH.button
+    [ HP.classes classes
+    , HE.onClick $ const $ Just commit
+    ]
+    [ HH.text "Set" ]
+
 componentDragSV ∷
-  { isLight ∷ Array ClassName
-  , isDark ∷ Array ClassName
-  , root ∷ Array ClassName
-  , selector ∷ Array ClassName
+  { isLight ∷ Array H.ClassName
+  , isDark ∷ Array H.ClassName
+  , root ∷ Array H.ClassName
+  , selector ∷ Array H.ClassName
   }
   → ColorComponent
 componentDragSV classes = DragComponentSpec
   { update: \{x, y} → modifyHSV _{ s = x, v = 1.0 - y}
-  , view: mkExistsRow $ DragComponentView \{isLight, hsv, color} props ->
+  , view: mkExistsRow $ DragComponentView \{isLight, hsv, color} props -> pure $
       HH.div
         ([ HP.classes $ classes.root <> if (force isLight) then classes.isLight else classes.isDark
         , HCSS.style $ CSS.backgroundColor $ Color.hsl (force hsv).h 1.0 0.5
@@ -171,13 +216,13 @@ componentDragSV classes = DragComponentSpec
 
 
 componentDragHue ∷
-  { root ∷ Array ClassName
-  , selector ∷ Array ClassName
+  { root ∷ Array H.ClassName
+  , selector ∷ Array H.ClassName
   }
   → ColorComponent
 componentDragHue classes = DragComponentSpec
   { update: \{y} → modifyHSL _{ h = (1.0 - y) * 360.0 }
-  , view: mkExistsRow $ DragComponentView \{isLight, hsv, color} props ->
+  , view: mkExistsRow $ DragComponentView \{isLight, hsv, color} props -> pure $
       HH.div
         ([ HP.classes classes.root ] <> props)
         [ HH.div
@@ -206,7 +251,7 @@ mkNumComponent update read classes conf = NumberComponentSpec
     , rootInvalid: classes.elemInvalid
     , rootLength: const []
     }
-  , view: NumberComponentView \ {} input -> renderInput
+  , view: NumberComponentView \ {} input -> pure $ renderInput
       { root: classes.root
       , label: classes.label
       , prefix: conf.prefix
@@ -284,7 +329,7 @@ componentBlue classes = mkNumComponent
 componentHEX ∷ InputProps Classes → ColorComponent
 componentHEX classes = TextComponentSpec
   { fromString: \str → Color.fromHexString $ "#" <> str
-  , view: mkExistsRow $ TextComponentView \env val props -> renderInput
+  , view: mkExistsRow $ TextComponentView \env val props -> pure $ renderInput
       { root: classes.root
       , label: classes.label
       , prefix: "#"

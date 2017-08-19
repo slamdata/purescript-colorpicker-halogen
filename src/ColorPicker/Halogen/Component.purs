@@ -1,45 +1,40 @@
 module ColorPicker.Halogen.Component
   ( picker
   , Query(GetValue, SetValue, Commit)
-  , ValueHistory
   , Message(..)
   , Props
-  , ClassGroup(..)
   , PickerEffects
   )
   where
 
 import Prelude
 
-import CSS as CSS
 import Color (Color)
 import Color as Color
-import ColorPicker.Halogen.ColorComponents (ColorComponent(..), DragComponentView(..), InputTextValue, LazyColor, NumberComponentView(..), PositionUpdate, TextComponentView(..), mkLazyColor, runExistsRow)
+import ColorPicker.Halogen.ColorComponents (ColorComponent(..), DragComponentView(..), InputTextValue, LazyColor, NumberComponentView(..), PositionUpdate, TextComponentView(..), ValueHistory, mkLazyColor, runExistsRow)
 import ColorPicker.Halogen.Layout as L
 import ColorPicker.Halogen.Utils.Drag as Drag
 import Control.Monad.Aff.Class (class MonadAff)
 import DOM.Classy.Event (preventDefault)
-import Data.Array (head, index, mapWithIndex, nubBy, take)
+import Data.Array (head, index, mapWithIndex, nubBy)
 import Data.Either (Either(..), either)
 import Data.Either.Nested as Either
-import Data.Foldable (foldr, for_)
+import Data.Foldable (fold, foldr, for_)
 import Data.Functor.Coproduct.Nested as Coproduct
 import Data.List as List
 import Data.Map (Map, insert, lookup)
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..))
 import Data.Monoid (mempty)
 import Data.Traversable (sequence)
 import Halogen (liftEff)
 import Halogen as H
 import Halogen.Component.ChildPath as CP
 import Halogen.HTML as HH
-import Halogen.HTML.CSS as HCSS
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Query.HalogenM (halt)
 import NumberInput.Halogen.Component as Num
 
-type ValueHistory a =  { old ∷ Array a, current ∷ a }
 type State =
   { color ∷ ValueHistory LazyColor
   , inputValues ∷ Map Cursor InputTextValue
@@ -48,22 +43,9 @@ type State =
 
 data Message = NextChange Color | NotifyChange Color
 
-classesFor ∷ Props → ClassGroup → Array HH.ClassName
-classesFor {classes} key = fromMaybe [] $ lookup key classes
-
-data ClassGroup
-  = Stage
-  | ColorBlockCurrent
-  | ColorBlockOld
-  | Actions
-  | ActionSet
-
-derive instance classGroupEq ∷ Eq ClassGroup
-derive instance classGroupOrd ∷ Ord ClassGroup
 
 type Props =
-  { classes ∷ Map ClassGroup (Array HH.ClassName)
-  , layout ∷ L.Layout
+  { layout ∷ L.Layout
   }
 
 
@@ -111,48 +93,29 @@ picker = H.lifecycleParentComponent
   }
 
 render ∷ ∀ m. State → HTML m
-render state = renderLayout state List.Nil state.props.layout
+render state =
+  let L.Root classes children = state.props.layout
+  in
+    HH.div
+      [HP.classes classes] $
+      fold $ mapWithIndex (\idx -> renderLayout state $ List.Cons idx List.Nil) children
 
 
-renderLayout ∷ ∀ m. State → Cursor → L.Layout → HTML m
+renderLayout ∷ ∀ m. State → Cursor → L.ChildLayout → Array (HTML m)
 renderLayout state@{ color, inputValues, props} cursor = case _ of
-  L.Group classes l →
+  L.Group classes l → pure $
     HH.div
       [ HP.classes classes ]
-      $ mapWithIndex (\idx → renderLayout state (List.Cons idx cursor)) l
-  L.Actions →
-    HH.div
-      [ HP.classes $ props `classesFor` Actions ]
-      [ HH.button
-          [ HP.classes $ props `classesFor` ActionSet
-          , HE.onClick $ HE.input \_ → Commit
-          ]
-          [ HH.text "Set" ]
-      ]
-  L.Stage →
-    let
-      current = HH.div
-        [ HP.classes $ classesFor props ColorBlockCurrent
-        , HP.title "Current value"
-        , HCSS.style $ CSS.backgroundColor color.current.color
-        ] []
-
-      old = take 4 color.old <#> \c ->
-        HH.div
-          [ HP.tabIndex 0
-          , HP.classes $ classesFor props ColorBlockOld
-          , HP.title "Old value"
-          , HE.onClick $ HE.input (\_ → ComponentUpdate $ const $ Just c.color)
-          , HCSS.style $ CSS.backgroundColor c.color
-          ] []
-    in
-      HH.div
-        [ HP.classes $ props `classesFor` Stage ] $
-        [ current ] <> old
-  L.Component c →  case c of
+      $ fold $ mapWithIndex (\idx → renderLayout state (List.Cons idx cursor)) l
+  L.Component c → case c of
+    ActionComponentSpec view → view
+      { color
+      , setColor: H.action <<< ComponentUpdate <<< const <<< Just
+      , commit: H.action Commit
+      }
     DragComponentSpec spec →
       let
-        run :: ∀ r. DragComponentView r -> HTML m
+        run :: ∀ r. DragComponentView r -> Array (HTML m)
         run (DragComponentView view) = view color.current $
           [ HE.onMouseDown $ HE.input (Left >>> DragStart spec.update)
           , HE.onTouchStart $ HE.input (Right >>> DragStart spec.update)
@@ -171,7 +134,7 @@ renderLayout state@{ color, inputValues, props} cursor = case _ of
             (HE.input \(Num.NotifyChange val) → NumberComponentUpdate cursor val)
     TextComponentSpec spec →
       let
-        run :: ∀ r. TextComponentView r -> HTML m
+        run :: ∀ r. TextComponentView r -> Array (HTML m)
         run (TextComponentView view) = view color.current
           (lookup cursor inputValues)
           [ HE.onValueInput $ HE.input $ TextComponentUpdate cursor spec.fromString
@@ -262,12 +225,14 @@ propagate = do
   where
   propagateLayout ∷ LazyColor → Cursor → L.Layout → DSL m Unit
   propagateLayout color cursor = case _ of
-    L.Group _ l → void $ sequence $ mapWithIndex (\idx → propagateLayout color (List.Cons idx cursor)) l
-    L.Stage → pure unit
-    L.Actions → pure unit
+    L.Root _ l → void $ sequence $ mapWithIndex (\idx → propagateChildLayout color (List.Cons idx cursor)) l
+  propagateChildLayout ∷ LazyColor → Cursor → L.ChildLayout → DSL m Unit
+  propagateChildLayout color cursor = case _ of
+    L.Group _ l → void $ sequence $ mapWithIndex (\idx → propagateChildLayout color (List.Cons idx cursor)) l
     L.Component c → case c of
       DragComponentSpec _ → pure unit
       TextComponentSpec _ → pure unit
+      ActionComponentSpec _ → pure unit
       NumberComponentSpec { read } →
         H.query' cpNumComponent cursor (H.action $ Num.SetValue $ Just $ read color) >>= mustBeMounted
 
@@ -277,8 +242,10 @@ mustBeMounted _ = halt "children must be mounted"
 
 type Cursor = List.List Int
 
-focus :: Cursor → L.Layout → Maybe L.Layout
-focus cursor layout = foldr f (Just layout) cursor
+focus :: Cursor → L.Layout → Maybe L.ChildLayout
+focus cursor layout =
+  let L.Root x children = layout
+  in foldr f (Just $ L.Group x children) cursor
   where
   f idx = case _ of
     Just (L.Group _ l) → index l idx

@@ -12,10 +12,9 @@ import Control.MonadZero (guard)
 import Data.Array (reverse)
 import Data.Either.Nested as Either
 import Data.Functor.Coproduct.Nested as Coproduct
-import Data.Map (Map, fromFoldable, insert, lookup)
+import Data.Map (Map, insert, lookup)
 import Data.Maybe (Maybe(..), maybe')
 import Data.Monoid (mempty)
-import Data.Tuple (Tuple(..))
 import Halogen (ClassName(..))
 import Halogen as H
 import Halogen.Aff as HA
@@ -104,7 +103,7 @@ config2 = mkConf id
 componentRedORNoRed ∷ C.ColorComponent
 componentRedORNoRed = C.TextComponentSpec
   { fromString: \str → if str == "red" then Just (red) else Nothing
-  , view: C.mkExistsRow $ C.TextComponentView \env val props ->
+  , view: C.mkExistsRow $ C.TextComponentView \env val props -> pure $
       HH.label
         [ HP.classes inputClasses.root]
         [ HH.span [HP.classes inputClasses.label] [HH.text "🛑"]
@@ -133,7 +132,7 @@ mkConf
   → CPicker.Props
 mkConf reverse' root editGroups =
   { layout:
-    L.Group [ ClassName "ColorPicker", root ] $ reverse'
+    L.Root [ ClassName "ColorPicker", root ] $ reverse'
       [ [ ClassName "ColorPicker-dragger" ] `L.Group`
           [ L.Component $ C.componentDragSV
               { root: [ ClassName "ColorPicker-field" ]
@@ -147,21 +146,18 @@ mkConf reverse' root editGroups =
               }
           ]
       , [ ClassName "ColorPicker-aside" ] `L.Group`
-          [ L.Stage
+          [ [ ClassName "ColorPicker-stage" ] `L.Group`
+              [ L.Component $ C.componentPreview [ ClassName "ColorPicker-colorBlockCurrent" ]
+              , L.Component $ C.componentHistory [ ClassName "ColorPicker-colorBlockOld" ]
+              ]
           , L.Group [ ClassName "ColorPicker-editing" ] $
               editGroups <#> \editGroup →
                 L.Group [ ClassName "ColorPicker-editingItem" ] $
                   editGroup <#> \mkItem -> L.Component $ mkItem inputClasses
-          , L.Actions
+          , [ ClassName "ColorPicker-actions" ] `L.Group`
+              [ L.Component $ C.componentSet [ ClassName "ColorPicker-actionSet" ] ]
           ]
       ]
-  , classes: fromFoldable
-    [ Tuple CPicker.Stage [ ClassName "ColorPicker-stage" ]
-    , Tuple CPicker.ColorBlockCurrent [ ClassName "ColorPicker-colorBlockCurrent" ]
-    , Tuple CPicker.ColorBlockOld [ ClassName "ColorPicker-colorBlockOld" ]
-    , Tuple CPicker.Actions [ ClassName "ColorPicker-actions" ]
-    , Tuple CPicker.ActionSet [ ClassName "ColorPicker-actionSet" ]
-    ]
   }
 
 inputClasses ∷ C.InputProps C.Classes
