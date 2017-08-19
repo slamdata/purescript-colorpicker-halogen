@@ -84,10 +84,10 @@ type Classes = Array H.ClassName
 type PreNumConf = { prefix ∷ String, title ∷ String, placeholder ∷ String, range ∷ Range Number }
 
 type LazyColor =
-  { color :: Color
-  , hsl :: Lazy RecordHSLA
-  , hsv :: Lazy RecordHSVA
-  , rgb :: Lazy RecordRGBA
+  { color ∷ Color
+  , hsl ∷ Lazy RecordHSLA
+  , hsv ∷ Lazy RecordHSVA
+  , rgb ∷ Lazy RecordRGBA
   }
 
 type InputProps c =
@@ -117,25 +117,25 @@ data PickerComponent
 
 type NumberComponentView =
   ∀ p i
-  . { color :: LazyColor
-    , input :: HH.HTML p i
+  . { color ∷ LazyColor
+    , input ∷ HH.HTML p i
     }
   → Array (HH.HTML p i)
 
 type TextComponentView =
   ∀ p i
-  . { color :: LazyColor
-    , value :: Maybe InputTextValue
-    , onValueInput :: String -> i
-    , onBlur :: FocusEvent -> i
+  . { color ∷ LazyColor
+    , value ∷ Maybe InputTextValue
+    , onValueInput ∷ String → i
+    , onBlur ∷ FocusEvent → i
     }
   → Array (HH.HTML p i)
 
 type DragComponentView =
   ∀ p i
-  . { color:: LazyColor
-    , onMouseDown :: MouseEvent -> i
-    , onTouchStart :: TouchEvent -> i
+  . { color∷ LazyColor
+    , onMouseDown ∷ MouseEvent → i
+    , onTouchStart ∷ TouchEvent → i
     }
   → Array (HH.HTML p i)
 
@@ -147,19 +147,19 @@ type ActionComponentView =
     }
   → Array (HH.HTML p i)
 
-mapValueHistory :: ∀ a b. (a -> b) -> ValueHistory a -> ValueHistory b
+mapValueHistory ∷ ∀ a b. (a → b) → ValueHistory a → ValueHistory b
 mapValueHistory f { current, old } = { current: f current, old: map f old }
 
-mkLazyColor :: Color -> LazyColor
+mkLazyColor ∷ Color → LazyColor
 mkLazyColor color =
   { color
-  , hsl: defer \_ -> Color.toHSLA color
-  , hsv: defer \_ -> Color.toHSVA color
-  , rgb: defer \_ -> Color.toRGBA color
+  , hsl: defer \_ → Color.toHSLA color
+  , hsv: defer \_ → Color.toHSVA color
+  , rgb: defer \_ → Color.toRGBA color
   }
 
 
-componentPreview ∷ Array H.ClassName -> PickerComponent
+componentPreview ∷ Array H.ClassName → PickerComponent
 componentPreview classes = ActionComponentSpec \{ color , setColor } → pure $
   HH.div
     [ HP.classes $ classes
@@ -167,9 +167,9 @@ componentPreview classes = ActionComponentSpec \{ color , setColor } → pure $
     , HCSS.style $ CSS.backgroundColor color.current.color
     ] []
 
-componentHistory ∷ Int -> Array H.ClassName -> PickerComponent
+componentHistory ∷ Int → Array H.ClassName → PickerComponent
 componentHistory historySize classes = ActionComponentSpec \{ color , setColor } →
-  take historySize color.old <#> \c ->
+  take historySize color.old <#> \c →
     HH.div
       [ HP.tabIndex 0
       , HP.classes $ classes
@@ -179,7 +179,7 @@ componentHistory historySize classes = ActionComponentSpec \{ color , setColor }
       ] []
 
 
-componentSet ∷ Array H.ClassName -> PickerComponent
+componentSet ∷ Array H.ClassName → PickerComponent
 componentSet classes = ActionComponentSpec \{ color: {current, old}, commit } → pure $
   HH.button
     [ HP.classes classes
@@ -197,7 +197,7 @@ componentDragSV ∷
   → PickerComponent
 componentDragSV classes = DragComponentSpec
   { update: \{x, y} → modifyHSV _{ s = x, v = 1.0 - y}
-  , view: \{color: {hsv, color}, onMouseDown, onTouchStart} -> pure $
+  , view: \{color: {hsv, color}, onMouseDown, onTouchStart} → pure $
       HH.div
         [ HP.classes $ classes.root <> if Color.isLight color then classes.isLight else classes.isDark
         , HCSS.style $ CSS.backgroundColor $ Color.hsl (force hsv).h 1.0 0.5
@@ -223,7 +223,7 @@ componentDragHue ∷
   → PickerComponent
 componentDragHue classes = DragComponentSpec
   { update: \{y} → modifyHSL _{ h = (1.0 - y) * 360.0 }
-  , view: \{color: {hsv, color}, onMouseDown, onTouchStart} -> pure $
+  , view: \{color: {hsv, color}, onMouseDown, onTouchStart} → pure $
       HH.div
         [ HP.classes classes.root
         , HE.onTouchStart $ onTouchStart >>> Just
@@ -238,11 +238,11 @@ componentDragHue classes = DragComponentSpec
     }
 
 mkNumComponent
-  :: (Number -> Dynamic (Maybe Color))
-  -> Dynamic Number
-  -> InputProps Classes
-  -> PreNumConf
-  -> PickerComponent
+  ∷ (Number → Dynamic (Maybe Color))
+  → Dynamic Number
+  → InputProps Classes
+  → PreNumConf
+  → PickerComponent
 mkNumComponent update read classes conf = NumberComponentSpec
   { update
   , read
@@ -255,7 +255,7 @@ mkNumComponent update read classes conf = NumberComponentSpec
     , rootInvalid: classes.elemInvalid
     , rootLength: const []
     }
-  , view: \ {input} -> pure $ renderInput
+  , view: \ {input} → pure $ renderInput
       { root: classes.root
       , label: classes.label
       , prefix: conf.prefix
@@ -325,7 +325,7 @@ componentBlue classes = mkNumComponent
 componentHEX ∷ InputProps Classes → PickerComponent
 componentHEX classes = TextComponentSpec
   { fromString: \str → Color.fromHexString $ "#" <> str
-  , view: \{color, value, onValueInput, onBlur} -> pure $
+  , view: \{color, value, onValueInput, onBlur} → pure $
       renderInput
         { root: classes.root
         , label: classes.label
@@ -336,7 +336,7 @@ componentHEX classes = TextComponentSpec
               $  classes.elem
               <> (guard (isInvalid value) *> (classes.elemInvalid))
             , HP.title "Hex"
-            , HP.value $ maybe' (\_ -> toString color) _.value value
+            , HP.value $ maybe' (\_ → toString color) _.value value
             , HP.placeholder "Hex"
             , HE.onValueInput $ onValueInput >>> Just
             , HE.onBlur $ onBlur >>> Just
@@ -347,19 +347,19 @@ componentHEX classes = TextComponentSpec
   toString =  \{color} → String.toUpper $ String.drop 1 $ Color.toHexString color
 
 
-isValid :: Maybe InputTextValue -> Boolean
+isValid ∷ Maybe InputTextValue → Boolean
 isValid = maybe true _.isValid
 
-isInvalid :: Maybe InputTextValue -> Boolean
+isInvalid ∷ Maybe InputTextValue → Boolean
 isInvalid = not isValid
 
-renderInput :: ∀ i p.
-  { child :: HH.HTML i p
-  , prefix :: String
-  , label :: Classes
-  , root :: Classes
+renderInput ∷ ∀ i p.
+  { child ∷ HH.HTML i p
+  , prefix ∷ String
+  , label ∷ Classes
+  , root ∷ Classes
   }
-  -> HH.HTML i p
+  → HH.HTML i p
 renderInput {root, label, prefix, child} =
   HH.label
     [ HP.classes root]

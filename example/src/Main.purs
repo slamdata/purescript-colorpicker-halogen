@@ -115,7 +115,7 @@ config2 = mkConf $ mkLayout
 componentRedORNoRed ∷ L.PickerComponent
 componentRedORNoRed = L.TextComponentSpec
   { fromString: \str → if str == "red" then Just (red) else Nothing
-  , view: \{color, value, onBlur, onValueInput } -> pure $
+  , view: \{color, value, onBlur, onValueInput } → pure $
       HH.label
         [ HP.classes inputClasses.root]
         [ HH.span [HP.classes inputClasses.label] [HH.text "🛑"]
@@ -125,7 +125,7 @@ componentRedORNoRed = L.TextComponentSpec
             $  inputClasses.elem
             <> (guard (L.isInvalid value) *> (inputClasses.elemInvalid))
           , HP.title "red or nored?"
-          , HP.value $ maybe' (\_ -> toString color) _.value value
+          , HP.value $ maybe' (\_ → toString color) _.value value
           , HP.placeholder "red"
           , HE.onValueInput $ onValueInput >>> Just
           , HE.onBlur $ onBlur >>> Just
@@ -137,7 +137,7 @@ componentRedORNoRed = L.TextComponentSpec
   toString =  \{color} → if color == red then "red" else "noRed"
 
 
-mkConf :: L.Layout -> CPicker.Props
+mkConf ∷ L.Layout → CPicker.Props
 mkConf = { layout: _ }
 
 mkLayout
@@ -166,7 +166,7 @@ mkLayout root editGroups =
         , L.Group [ H.ClassName "ColorPicker-editing" ] $
             editGroups <#> \editGroup →
               L.Group [ H.ClassName "ColorPicker-editingItem" ] $
-                editGroup <#> \mkItem -> L.Component $ mkItem inputClasses
+                editGroup <#> \mkItem → L.Component $ mkItem inputClasses
         , [ H.ClassName "ColorPicker-actions" ] `L.Group`
             [ L.Component $ L.componentSet [ H.ClassName "ColorPicker-actionSet" ] ]
         ]

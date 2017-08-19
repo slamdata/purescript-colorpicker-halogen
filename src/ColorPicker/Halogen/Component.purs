@@ -97,7 +97,7 @@ render state =
   in
     HH.div
       [HP.classes classes] $
-      fold $ mapWithIndex (\idx -> renderLayout state $ List.Cons idx List.Nil) children
+      fold $ mapWithIndex (\idx → renderLayout state $ List.Cons idx List.Nil) children
 
 
 renderLayout ∷ ∀ m. State → Cursor → ChildLayout → Array (HTML m)
@@ -139,8 +139,8 @@ eval = case _ of
   TextComponentBlur cursor next → do
     state ← H.get
     let val = lookup cursor state.inputValues
-    for_ (lookup cursor state.inputValues) \val ->
-      when val.isValid $ H.modify _ { inputValues = mempty :: Map Cursor InputTextValue }
+    for_ (lookup cursor state.inputValues) \val →
+      when val.isValid $ H.modify _ { inputValues = mempty ∷ Map Cursor InputTextValue }
     pure next
   TextComponentUpdate cursor fromString str next → do
     let
@@ -148,7 +148,7 @@ eval = case _ of
       isValid = case color of
         Nothing → false
         Just _ → true
-    state <- H.get
+    state ← H.get
     let state' = state { inputValues = insert cursor {isValid, value: str} state.inputValues }
     for_ color $ updateColor state'
     pure next
@@ -171,7 +171,7 @@ eval = case _ of
     state ← H.get
     H.put $ state{ color =
       { current: state.color.current
-      , old: nubBy (\a b -> eq a.color b.color) $ [state.color.current] <> state.color.old
+      , old: nubBy (\a b → eq a.color b.color) $ [state.color.current] <> state.color.old
       }}
     H.raise $ NotifyChange state.color.current.color
     pure next
@@ -231,7 +231,7 @@ mustBeMounted _ = halt "children must be mounted"
 
 type Cursor = List.List Int
 
-focus :: Cursor → Layout → Maybe ChildLayout
+focus ∷ Cursor → Layout → Maybe ChildLayout
 focus cursor layout =
   let Root x children = layout
   in foldr f (Just $ Group x children) cursor
