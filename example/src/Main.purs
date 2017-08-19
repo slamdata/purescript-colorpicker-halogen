@@ -161,7 +161,7 @@ mkLayout root editGroups =
     , [ H.ClassName "ColorPicker-aside" ] `L.Group`
         [ [ H.ClassName "ColorPicker-stage" ] `L.Group`
             [ L.Component $ L.componentPreview [ H.ClassName "ColorPicker-colorBlockCurrent" ]
-            , L.Component $ L.componentHistory [ H.ClassName "ColorPicker-colorBlockOld" ]
+            , L.Component $ L.componentHistory 4 [ H.ClassName "ColorPicker-colorBlockOld" ]
             ]
         , L.Group [ H.ClassName "ColorPicker-editing" ] $
             editGroups <#> \editGroup →

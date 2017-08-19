@@ -167,9 +167,9 @@ componentPreview classes = ActionComponentSpec \{ color , setColor } → pure $
     , HCSS.style $ CSS.backgroundColor color.current.color
     ] []
 
-componentHistory ∷ Array H.ClassName -> PickerComponent
-componentHistory classes = ActionComponentSpec \{ color , setColor } →
-  take 4 color.old <#> \c ->
+componentHistory ∷ Int -> Array H.ClassName -> PickerComponent
+componentHistory historySize classes = ActionComponentSpec \{ color , setColor } →
+  take historySize color.old <#> \c ->
     HH.div
       [ HP.tabIndex 0
       , HP.classes $ classes
