@@ -11,7 +11,7 @@ import Prelude
 
 import Color (Color)
 import Color as Color
-import ColorPicker.Halogen.ColorComponents (ColorComponent(..), InputTextValue, LazyColor, PositionUpdate, ValueHistory, mkLazyColor)
+import ColorPicker.Halogen.ColorComponents (ColorComponent(..), InputTextValue, LazyColor, PositionUpdate, ValueHistory, mapValueHistory, mkLazyColor)
 import ColorPicker.Halogen.Layout as L
 import ColorPicker.Halogen.Utils.Drag as Drag
 import Control.Monad.Aff.Class (class MonadAff)
@@ -59,8 +59,9 @@ data Query a
   | TextComponentBlur Cursor a
   | Commit a
   | Init a
-  | GetValue (ValueHistory LazyColor → a) -- TODO make ValueHistory and use normal Color here
-  | SetValue (ValueHistory LazyColor) a
+  | GetValue (ValueHistory Color → a)
+  | SetValue (ValueHistory Color) a
+
 
 type ChildQuery = Coproduct.Coproduct1 (Num.Query Number)
 type Slot = Either.Either1 Cursor
@@ -161,9 +162,9 @@ eval = case _ of
     pure next
   SetValue val next → do
     state ← H.get
-    H.put $ state{ color = val }
+    H.put $ state{ color = mapValueHistory mkLazyColor val }
     pure next
-  GetValue next → H.get <#> (_.color >>> next)
+  GetValue next → H.get <#> (_.color >>> (mapValueHistory _.color) >>> next)
   Init next → do
     propagate
     pure next

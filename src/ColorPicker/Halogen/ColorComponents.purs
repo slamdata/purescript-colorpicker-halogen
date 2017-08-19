@@ -30,6 +30,7 @@ module ColorPicker.Halogen.ColorComponents
   , mkLazyColor
   , LazyColor
   , ValueHistory
+  , mapValueHistory
   , componentPreview
   , componentHistory
   , componentSet
@@ -56,6 +57,9 @@ import Math (round)
 import NumberInput.Halogen.Component as Num
 import NumberInput.Range (Range(..))
 
+
+mapValueHistory :: ∀ a b. (a -> b) -> ValueHistory a -> ValueHistory b
+mapValueHistory f { current, old } = { current: f current, old: map f old }
 
 type ValueHistory a =  { old ∷ Array a, current ∷ a }
 
