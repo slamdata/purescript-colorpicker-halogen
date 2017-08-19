@@ -53,8 +53,7 @@ data Query a
   = SetProps Props a
   | DragStart PositionUpdate Drag.CursorEvent a
   | DragMove PositionUpdate Drag.DragEvent a
-  -- TODO `ComponentUpdate` could be removed at some point
-  | ComponentUpdate (Color → Maybe Color) a
+  | UpdateCurrentColor Color a
   | NumberComponentUpdate Cursor (Maybe Number) a
   | TextComponentUpdate Cursor (String → Maybe Color) String a
   | TextComponentBlur Cursor a
@@ -110,7 +109,7 @@ renderLayout state@{ color, inputValues, props} cursor = case _ of
   L.Component c → case c of
     ActionComponentSpec view → view
       { color
-      , setColor: H.action <<< ComponentUpdate <<< const <<< Just
+      , setColor: H.action <<< UpdateCurrentColor
       , commit: H.action Commit
       }
     DragComponentSpec spec → spec.view
@@ -149,16 +148,17 @@ eval = case _ of
       isValid = case color of
         Nothing → false
         Just _ → true
-    H.modify \s → s { inputValues = insert cursor {isValid, value: str} s.inputValues }
-    eval $ ComponentUpdate (const color) next
+    state <- H.get
+    let state' = state { inputValues = insert cursor {isValid, value: str} state.inputValues }
+    for_ color $ updateColor state'
+    pure next
   NumberComponentUpdate cursor num next → do
-    { color, props } ← H.get
-    case focus cursor props.layout of
-      Just (L.Component (NumberComponentSpec { update })) → eval $
-       ComponentUpdate
-        (\_ → update <$> num >>= (_ $ color.current))
-        next
-      _ → pure next
+    state ← H.get
+    case focus cursor state.props.layout of
+      Just (L.Component (NumberComponentSpec { update })) →
+        for_ (update <$> num >>= (_ $ state.color.current)) $ updateColor state
+      _ → pure unit
+    pure next
   SetValue val next → do
     state ← H.get
     H.put $ state{ color = val }
@@ -177,10 +177,9 @@ eval = case _ of
         }}
       H.raise $ NotifyChange state.color.current.color
     pure next
-  ComponentUpdate update next → do
+  UpdateCurrentColor color next → do
     state ← H.get
-    for_ (update state.color.current.color) $ \color' → do
-      updateColor state $ color'
+    updateColor state color
     pure next
   SetProps props next → do
     H.modify _{props = props}
