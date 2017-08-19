@@ -27,12 +27,6 @@ module ColorPicker.Halogen.ColorComponents
   , componentDragHue
   , componentDragSV
   , mapInputProps
-  , ExistsRow
-  , DragComponentView(..)
-  , mkExistsRow
-  , runExistsRow
-  , TextComponentView(..)
-  , NumberComponentView(..)
   , mkLazyColor
   , LazyColor
   , ValueHistory
@@ -47,7 +41,7 @@ import CSS as CSS
 import Color (Color)
 import Color as Color
 import Control.MonadZero (guard)
-import DOM.Event.Types (Event, FocusEvent, MouseEvent, TouchEvent)
+import DOM.Event.Types (FocusEvent, MouseEvent, TouchEvent)
 import Data.Array (take)
 import Data.Int (floor, toNumber)
 import Data.Lazy (Lazy, defer, force)
@@ -61,7 +55,6 @@ import Halogen.HTML.Properties as HP
 import Math (round)
 import NumberInput.Halogen.Component as Num
 import NumberInput.Range (Range(..))
-import Unsafe.Coerce (unsafeCoerce)
 
 
 type ValueHistory a =  { old ∷ Array a, current ∷ a }
@@ -110,15 +103,36 @@ data ColorComponent
     { update ∷ Number → Dynamic (Maybe Color)
     , read ∷ Dynamic Number
     , props ∷ Num.Props Number
-    , view ∷ NumberComponentView
+    , view ∷
+      ( ∀ p i
+      . { color :: LazyColor
+        , input :: HH.HTML p i
+        }
+      → Array (HH.HTML p i)
+      )
     }
   | TextComponentSpec
     { fromString ∷ String → Maybe Color
-    , view ∷ ExistsRow TextComponentView
+    , view ∷
+      ( ∀ p i
+      . { color :: LazyColor
+        , value :: Maybe InputTextValue
+        , onValueInput :: String -> i
+        , onBlur :: FocusEvent -> i
+        }
+      → Array (HH.HTML p i)
+      )
     }
   | DragComponentSpec
     { update ∷ PositionUpdate
-    , view ∷ ExistsRow DragComponentView
+    , view ∷
+      ( ∀ p i
+      . { color:: LazyColor
+        , onMouseDown :: MouseEvent -> i
+        , onTouchStart :: TouchEvent -> i
+        }
+      → Array (HH.HTML p i)
+      )
     }
   | ActionComponentSpec
     ( ∀ p i
@@ -128,37 +142,6 @@ data ColorComponent
       }
     → Array (HH.HTML p i)
     )
-
-
-newtype NumberComponentView = NumberComponentView
-  ( ∀ p i
-  . LazyColor
-  → HH.HTML p i
-  → Array (HH.HTML p i)
-  )
-
-newtype TextComponentView r = TextComponentView
-  ( ∀ p i
-  . LazyColor
-  → Maybe InputTextValue
-  → Array (HH.IProp (value :: String, onInput :: Event, onBlur :: FocusEvent | r) i)
-  → Array (HH.HTML p i)
-  )
-
-newtype DragComponentView r = DragComponentView
-  ( ∀ p i
-  . LazyColor
-  → Array (HH.IProp (onMouseDown :: MouseEvent, onTouchStart :: TouchEvent | r) i)
-  → Array (HH.HTML p i)
-  )
-
-foreign import data ExistsRow :: (# Type -> Type) -> Type
-
-mkExistsRow :: ∀ f r. f r -> ExistsRow f
-mkExistsRow = unsafeCoerce
-
-runExistsRow :: ∀ f a. (∀ r. f r -> a) -> ExistsRow f -> a
-runExistsRow = unsafeCoerce
 
 
 componentPreview ∷ Array H.ClassName -> ColorComponent
@@ -198,11 +181,13 @@ componentDragSV ∷
   → ColorComponent
 componentDragSV classes = DragComponentSpec
   { update: \{x, y} → modifyHSV _{ s = x, v = 1.0 - y}
-  , view: mkExistsRow $ DragComponentView \{isLight, hsv, color} props -> pure $
+  , view: \{color: {isLight, hsv, color}, onMouseDown, onTouchStart} -> pure $
       HH.div
-        ([ HP.classes $ classes.root <> if (force isLight) then classes.isLight else classes.isDark
+        [ HP.classes $ classes.root <> if (force isLight) then classes.isLight else classes.isDark
         , HCSS.style $ CSS.backgroundColor $ Color.hsl (force hsv).h 1.0 0.5
-        ] <> props)
+        , HE.onTouchStart $ onTouchStart >>> Just
+        , HE.onMouseDown $ onMouseDown >>> Just
+        ]
         [ HH.div
           [ HP.classes classes.selector
           , HCSS.style do
@@ -222,9 +207,12 @@ componentDragHue ∷
   → ColorComponent
 componentDragHue classes = DragComponentSpec
   { update: \{y} → modifyHSL _{ h = (1.0 - y) * 360.0 }
-  , view: mkExistsRow $ DragComponentView \{isLight, hsv, color} props -> pure $
+  , view: \{color: {isLight, hsv, color}, onMouseDown, onTouchStart} -> pure $
       HH.div
-        ([ HP.classes classes.root ] <> props)
+        [ HP.classes classes.root
+        , HE.onTouchStart $ onTouchStart >>> Just
+        , HE.onMouseDown $ onMouseDown >>> Just
+        ]
         [ HH.div
           [ HP.classes classes.selector
           , HCSS.style $ CSS.top $ CSS.pct ((1.0 - (force hsv).h / 360.0) * 100.0)
@@ -251,7 +239,7 @@ mkNumComponent update read classes conf = NumberComponentSpec
     , rootInvalid: classes.elemInvalid
     , rootLength: const []
     }
-  , view: NumberComponentView \ {} input -> pure $ renderInput
+  , view: \ {input} -> pure $ renderInput
       { root: classes.root
       , label: classes.label
       , prefix: conf.prefix
@@ -329,20 +317,23 @@ componentBlue classes = mkNumComponent
 componentHEX ∷ InputProps Classes → ColorComponent
 componentHEX classes = TextComponentSpec
   { fromString: \str → Color.fromHexString $ "#" <> str
-  , view: mkExistsRow $ TextComponentView \env val props -> pure $ renderInput
-      { root: classes.root
-      , label: classes.label
-      , prefix: "#"
-      , child: HH.input $
-          [ HP.type_ HP.InputText
-          , HP.classes
-            $  classes.elem
-            <> (guard (isInvalid val) *> (classes.elemInvalid))
-          , HP.title "Hex"
-          , HP.value $ maybe' (\_ -> toString env) _.value val
-          , HP.placeholder "Hex"
-          ] <> props
-      }
+  , view: \{color, value, onValueInput, onBlur} -> pure $
+      renderInput
+        { root: classes.root
+        , label: classes.label
+        , prefix: "#"
+        , child: HH.input $
+            [ HP.type_ HP.InputText
+            , HP.classes
+              $  classes.elem
+              <> (guard (isInvalid value) *> (classes.elemInvalid))
+            , HP.title "Hex"
+            , HP.value $ maybe' (\_ -> toString color) _.value value
+            , HP.placeholder "Hex"
+            , HE.onValueInput $ onValueInput >>> Just
+            , HE.onBlur $ onBlur >>> Just
+            ]
+        }
   }
   where
   toString =  \{color} → String.toUpper $ String.drop 1 $ Color.toHexString color

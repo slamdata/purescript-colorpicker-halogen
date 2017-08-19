@@ -103,19 +103,21 @@ config2 = mkConf id
 componentRedORNoRed ∷ C.ColorComponent
 componentRedORNoRed = C.TextComponentSpec
   { fromString: \str → if str == "red" then Just (red) else Nothing
-  , view: C.mkExistsRow $ C.TextComponentView \env val props -> pure $
+  , view: \{color, value, onBlur, onValueInput } -> pure $
       HH.label
         [ HP.classes inputClasses.root]
         [ HH.span [HP.classes inputClasses.label] [HH.text "🛑"]
-        , HH.input $
+        , HH.input
           [ HP.type_ HP.InputText
           , HP.classes
             $  inputClasses.elem
-            <> (guard (C.isInvalid val) *> (inputClasses.elemInvalid))
+            <> (guard (C.isInvalid value) *> (inputClasses.elemInvalid))
           , HP.title "red or nored?"
-          , HP.value $ maybe' (\_ -> toString env) _.value val
+          , HP.value $ maybe' (\_ -> toString color) _.value value
           , HP.placeholder "red"
-          ] <> props
+          , HE.onValueInput $ onValueInput >>> Just
+          , HE.onBlur $ onBlur >>> Just
+          ]
         ]
   }
   where

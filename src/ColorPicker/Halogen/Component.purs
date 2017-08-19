@@ -11,7 +11,7 @@ import Prelude
 
 import Color (Color)
 import Color as Color
-import ColorPicker.Halogen.ColorComponents (ColorComponent(..), DragComponentView(..), InputTextValue, LazyColor, NumberComponentView(..), PositionUpdate, TextComponentView(..), ValueHistory, mkLazyColor, runExistsRow)
+import ColorPicker.Halogen.ColorComponents (ColorComponent(..), InputTextValue, LazyColor, PositionUpdate, ValueHistory, mkLazyColor)
 import ColorPicker.Halogen.Layout as L
 import ColorPicker.Halogen.Utils.Drag as Drag
 import Control.Monad.Aff.Class (class MonadAff)
@@ -113,34 +113,26 @@ renderLayout state@{ color, inputValues, props} cursor = case _ of
       , setColor: H.action <<< ComponentUpdate <<< const <<< Just
       , commit: H.action Commit
       }
-    DragComponentSpec spec →
-      let
-        run :: ∀ r. DragComponentView r -> Array (HTML m)
-        run (DragComponentView view) = view color.current $
-          [ HE.onMouseDown $ HE.input (Left >>> DragStart spec.update)
-          , HE.onTouchStart $ HE.input (Right >>> DragStart spec.update)
-          ]
-      in runExistsRow run spec.view
-    NumberComponentSpec spec →
-      let
-        NumberComponentView view = spec.view
-      in
-        view color.current $
-          HH.slot'
-            cpNumComponent
-            cursor
-            Num.input
-            spec.props
-            (HE.input \(Num.NotifyChange val) → NumberComponentUpdate cursor val)
-    TextComponentSpec spec →
-      let
-        run :: ∀ r. TextComponentView r -> Array (HTML m)
-        run (TextComponentView view) = view color.current
-          (lookup cursor inputValues)
-          [ HE.onValueInput $ HE.input $ TextComponentUpdate cursor spec.fromString
-          , HE.onBlur $ HE.input_ $ TextComponentBlur cursor
-          ]
-      in runExistsRow run spec.view
+    DragComponentSpec spec → spec.view
+      { color: color.current
+      , onMouseDown: Left >>> DragStart spec.update >>> H.action
+      , onTouchStart: Right >>> DragStart spec.update >>> H.action
+      }
+    NumberComponentSpec spec → spec.view
+      { color: color.current
+      , input: HH.slot'
+          cpNumComponent
+          cursor
+          Num.input
+          spec.props
+          (HE.input \(Num.NotifyChange val) → NumberComponentUpdate cursor val)
+      }
+    TextComponentSpec spec → spec.view
+      { color: color.current
+      , value: lookup cursor inputValues
+      , onValueInput: TextComponentUpdate cursor spec.fromString >>> H.action
+      , onBlur: const (TextComponentBlur cursor) >>> H.action
+      }
 
 
 eval ∷ ∀ m r. MonadAff (PickerEffects r) m ⇒ Query ~> DSL m
