@@ -3,7 +3,6 @@ module Main where
 import Prelude
 
 import Color (Color, rgb)
-import ColorPicker.Halogen.ColorComponents as C
 import ColorPicker.Halogen.Component as CPicker
 import ColorPicker.Halogen.Layout as L
 import Control.Monad.Aff.Class (class MonadAff)
@@ -85,25 +84,25 @@ eval (HandleMsg idx msg next) = do
 config0 ∷ CPicker.Props
 config0 = mkConf reverse
   (ClassName "ColorPicker--small")
-  [ [ C.componentHue
-    , C.componentSaturationHSL
-    , C.componentLightness
+  [ [ L.componentHue
+    , L.componentSaturationHSL
+    , L.componentLightness
     ]
   ]
 
 config1 ∷ CPicker.Props
 config1 = mkConf id
   (ClassName "ColorPicker--large")
-  [ [ C.componentHue
-    , C.componentSaturationHSV
-    , C.componentValue
-    , C.componentSaturationHSL
-    , C.componentLightness
+  [ [ L.componentHue
+    , L.componentSaturationHSV
+    , L.componentValue
+    , L.componentSaturationHSL
+    , L.componentLightness
     ]
-  , [ C.componentRed
-    , C.componentGreen
-    , C.componentBlue
-    , C.componentHEX
+  , [ L.componentRed
+    , L.componentGreen
+    , L.componentBlue
+    , L.componentHEX
     ]
   ]
 
@@ -112,8 +111,8 @@ config2 = mkConf id
   (ClassName "ColorPicker--small")
   [ [ const componentRedORNoRed ]]
 
-componentRedORNoRed ∷ C.ColorComponent
-componentRedORNoRed = C.TextComponentSpec
+componentRedORNoRed ∷ L.ColorComponent
+componentRedORNoRed = L.TextComponentSpec
   { fromString: \str → if str == "red" then Just (red) else Nothing
   , view: \{color, value, onBlur, onValueInput } -> pure $
       HH.label
@@ -123,7 +122,7 @@ componentRedORNoRed = C.TextComponentSpec
           [ HP.type_ HP.InputText
           , HP.classes
             $  inputClasses.elem
-            <> (guard (C.isInvalid value) *> (inputClasses.elemInvalid))
+            <> (guard (L.isInvalid value) *> (inputClasses.elemInvalid))
           , HP.title "red or nored?"
           , HP.value $ maybe' (\_ -> toString color) _.value value
           , HP.placeholder "red"
@@ -142,39 +141,39 @@ componentRedORNoRed = C.TextComponentSpec
 mkConf
   ∷ (∀ a. Array a → Array a)
   → ClassName
-  → Array (Array (C.InputProps C.Classes → C.ColorComponent))
+  → Array (Array (L.InputProps L.Classes → L.ColorComponent))
   → CPicker.Props
 mkConf reverse' root editGroups =
   { layout:
     L.Root [ ClassName "ColorPicker", root ] $ reverse'
       [ [ ClassName "ColorPicker-dragger" ] `L.Group`
-          [ L.Component $ C.componentDragSV
+          [ L.Component $ L.componentDragSV
               { root: [ ClassName "ColorPicker-field" ]
               , isLight: [ ClassName "IsLight" ]
               , isDark: [ ClassName "IsDark" ]
               , selector: [ ClassName "ColorPicker-fieldSelector"]
               }
-          , L.Component $ C.componentDragHue
+          , L.Component $ L.componentDragHue
               { root: [ ClassName "ColorPicker-slider" ]
               , selector: [ ClassName "ColorPicker-sliderSelector"]
               }
           ]
       , [ ClassName "ColorPicker-aside" ] `L.Group`
           [ [ ClassName "ColorPicker-stage" ] `L.Group`
-              [ L.Component $ C.componentPreview [ ClassName "ColorPicker-colorBlockCurrent" ]
-              , L.Component $ C.componentHistory [ ClassName "ColorPicker-colorBlockOld" ]
+              [ L.Component $ L.componentPreview [ ClassName "ColorPicker-colorBlockCurrent" ]
+              , L.Component $ L.componentHistory [ ClassName "ColorPicker-colorBlockOld" ]
               ]
           , L.Group [ ClassName "ColorPicker-editing" ] $
               editGroups <#> \editGroup →
                 L.Group [ ClassName "ColorPicker-editingItem" ] $
                   editGroup <#> \mkItem -> L.Component $ mkItem inputClasses
           , [ ClassName "ColorPicker-actions" ] `L.Group`
-              [ L.Component $ C.componentSet [ ClassName "ColorPicker-actionSet" ] ]
+              [ L.Component $ L.componentSet [ ClassName "ColorPicker-actionSet" ] ]
           ]
       ]
   }
 
-inputClasses ∷ C.InputProps C.Classes
+inputClasses ∷ L.InputProps L.Classes
 inputClasses =
   { root: [ClassName "ColorPicker-input"]
   , label: [ClassName "ColorPicker-inputLabel"]

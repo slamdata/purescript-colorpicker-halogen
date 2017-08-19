@@ -11,8 +11,7 @@ import Prelude
 
 import Color (Color)
 import Color as Color
-import ColorPicker.Halogen.ColorComponents (ColorComponent(..), InputTextValue, LazyColor, PositionUpdate, ValueHistory, mapValueHistory, mkLazyColor)
-import ColorPicker.Halogen.Layout as L
+import ColorPicker.Halogen.Layout (Layout(..), ChildLayout(..), ColorComponent(..), InputTextValue, LazyColor, PositionUpdate, ValueHistory, mapValueHistory, mkLazyColor)
 import ColorPicker.Halogen.Utils.Drag as Drag
 import Control.Monad.Aff.Class (class MonadAff)
 import DOM.Classy.Event (preventDefault)
@@ -45,7 +44,7 @@ data Message = NextChange Color | NotifyChange Color
 
 
 type Props =
-  { layout ∷ L.Layout
+  { layout ∷ Layout
   }
 
 
@@ -94,20 +93,20 @@ picker = H.lifecycleParentComponent
 
 render ∷ ∀ m. State → HTML m
 render state =
-  let L.Root classes children = state.props.layout
+  let Root classes children = state.props.layout
   in
     HH.div
       [HP.classes classes] $
       fold $ mapWithIndex (\idx -> renderLayout state $ List.Cons idx List.Nil) children
 
 
-renderLayout ∷ ∀ m. State → Cursor → L.ChildLayout → Array (HTML m)
+renderLayout ∷ ∀ m. State → Cursor → ChildLayout → Array (HTML m)
 renderLayout state@{ color, inputValues, props} cursor = case _ of
-  L.Group classes l → pure $
+  Group classes l → pure $
     HH.div
       [ HP.classes classes ]
       $ fold $ mapWithIndex (\idx → renderLayout state (List.Cons idx cursor)) l
-  L.Component c → case c of
+  Component c → case c of
     ActionComponentSpec view → view
       { color
       , setColor: H.action <<< UpdateCurrentColor
@@ -156,7 +155,7 @@ eval = case _ of
   NumberComponentUpdate cursor num next → do
     state ← H.get
     case focus cursor state.props.layout of
-      Just (L.Component (NumberComponentSpec { update })) →
+      Just (Component (NumberComponentSpec { update })) →
         for_ (update <$> num >>= (_ $ state.color.current)) $ updateColor state
       _ → pure unit
     pure next
@@ -213,13 +212,13 @@ propagate = do
     List.Nil
     layout
   where
-  propagateLayout ∷ LazyColor → Cursor → L.Layout → DSL m Unit
+  propagateLayout ∷ LazyColor → Cursor → Layout → DSL m Unit
   propagateLayout color cursor = case _ of
-    L.Root _ l → void $ sequence $ mapWithIndex (\idx → propagateChildLayout color (List.Cons idx cursor)) l
-  propagateChildLayout ∷ LazyColor → Cursor → L.ChildLayout → DSL m Unit
+    Root _ l → void $ sequence $ mapWithIndex (\idx → propagateChildLayout color (List.Cons idx cursor)) l
+  propagateChildLayout ∷ LazyColor → Cursor → ChildLayout → DSL m Unit
   propagateChildLayout color cursor = case _ of
-    L.Group _ l → void $ sequence $ mapWithIndex (\idx → propagateChildLayout color (List.Cons idx cursor)) l
-    L.Component c → case c of
+    Group _ l → void $ sequence $ mapWithIndex (\idx → propagateChildLayout color (List.Cons idx cursor)) l
+    Component c → case c of
       DragComponentSpec _ → pure unit
       TextComponentSpec _ → pure unit
       ActionComponentSpec _ → pure unit
@@ -232,11 +231,11 @@ mustBeMounted _ = halt "children must be mounted"
 
 type Cursor = List.List Int
 
-focus :: Cursor → L.Layout → Maybe L.ChildLayout
+focus :: Cursor → Layout → Maybe ChildLayout
 focus cursor layout =
-  let L.Root x children = layout
-  in foldr f (Just $ L.Group x children) cursor
+  let Root x children = layout
+  in foldr f (Just $ Group x children) cursor
   where
   f idx = case _ of
-    Just (L.Group _ l) → index l idx
+    Just (Group _ l) → index l idx
     _ → Nothing
