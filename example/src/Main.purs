@@ -85,14 +85,26 @@ eval (HandleMsg idx msg next) = do
 config0 ∷ CPicker.Props
 config0 = mkConf reverse
   (ClassName "ColorPicker--small")
-  [ [C.componentHue] <> C.componentSL
+  [ [ C.componentHue
+    , C.componentSaturationHSL
+    , C.componentLightness
+    ]
   ]
 
 config1 ∷ CPicker.Props
 config1 = mkConf id
   (ClassName "ColorPicker--large")
-  [ [C.componentHue] <> C.componentSV <> C.componentSL
-  , C.componentRGB <> [C.componentHEX]
+  [ [ C.componentHue
+    , C.componentSaturationHSV
+    , C.componentValue
+    , C.componentSaturationHSL
+    , C.componentLightness
+    ]
+  , [ C.componentRed
+    , C.componentGreen
+    , C.componentBlue
+    , C.componentHEX
+    ]
   ]
 
 config2 ∷ CPicker.Props

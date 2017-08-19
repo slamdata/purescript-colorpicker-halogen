@@ -1,17 +1,30 @@
 module ColorPicker.Halogen.ColorComponents
   ( ColorComponent(..)
+
+  , NumberComponentView
+  , TextComponentView
+  , DragComponentView
+  , ActionComponentView
+
   , InputTextValue
   , isValid
   , isInvalid
+
+  , PositionUpdate
   , Dynamic
   , PreNumConf
-  , PreTextConf
   , InputProps
   , Classes
+  , ValueHistory
+  , mapValueHistory
+
+  , LazyColor
   , RecordHSLA
   , RecordHSVA
   , RecordRGBA
-  , PositionUpdate
+  , mkLazyColor
+
+
   , componentHue
   , componentSaturationHSL
   , componentLightness
@@ -21,16 +34,8 @@ module ColorPicker.Halogen.ColorComponents
   , componentGreen
   , componentBlue
   , componentHEX
-  , componentSL
-  , componentSV
-  , componentRGB
   , componentDragHue
   , componentDragSV
-  , mapInputProps
-  , mkLazyColor
-  , LazyColor
-  , ValueHistory
-  , mapValueHistory
   , componentPreview
   , componentHistory
   , componentSet
@@ -58,9 +63,6 @@ import NumberInput.Halogen.Component as Num
 import NumberInput.Range (Range(..))
 
 
-mapValueHistory :: ∀ a b. (a -> b) -> ValueHistory a -> ValueHistory b
-mapValueHistory f { current, old } = { current: f current, old: map f old }
-
 type ValueHistory a =  { old ∷ Array a, current ∷ a }
 
 type InputTextValue = { value ∷ String, isValid ∷ Boolean }
@@ -73,9 +75,6 @@ type Classes = Array H.ClassName
 
 type PreNumConf = { prefix ∷ String, title ∷ String, placeholder ∷ String, range ∷ Range Number }
 
-type PreTextConf = { prefix ∷ String, title ∷ String, placeholder ∷ String }
-
-
 type LazyColor =
   { color :: Color
   , hsl :: Lazy RecordHSLA
@@ -83,16 +82,6 @@ type LazyColor =
   , rgb :: Lazy RecordRGBA
   , isLight :: Lazy Boolean
   }
-
-mkLazyColor :: Color -> LazyColor
-mkLazyColor color =
-  { color
-  , hsl: defer \_ -> Color.toHSLA color
-  , hsv: defer \_ -> Color.toHSVA color
-  , rgb: defer \_ -> Color.toRGBA color
-  , isLight: defer \_ -> Color.isLight color
-  }
-
 
 type InputProps c =
   { root ∷ c
@@ -107,45 +96,61 @@ data ColorComponent
     { update ∷ Number → Dynamic (Maybe Color)
     , read ∷ Dynamic Number
     , props ∷ Num.Props Number
-    , view ∷
-      ( ∀ p i
-      . { color :: LazyColor
-        , input :: HH.HTML p i
-        }
-      → Array (HH.HTML p i)
-      )
+    , view ∷ NumberComponentView
     }
   | TextComponentSpec
     { fromString ∷ String → Maybe Color
-    , view ∷
-      ( ∀ p i
-      . { color :: LazyColor
-        , value :: Maybe InputTextValue
-        , onValueInput :: String -> i
-        , onBlur :: FocusEvent -> i
-        }
-      → Array (HH.HTML p i)
-      )
+    , view ∷ TextComponentView
     }
   | DragComponentSpec
     { update ∷ PositionUpdate
-    , view ∷
-      ( ∀ p i
-      . { color:: LazyColor
-        , onMouseDown :: MouseEvent -> i
-        , onTouchStart :: TouchEvent -> i
-        }
-      → Array (HH.HTML p i)
-      )
+    , view ∷ DragComponentView
     }
-  | ActionComponentSpec
-    ( ∀ p i
-    . { color ∷ ValueHistory LazyColor
-      , setColor ∷ Color → i
-      , commit ∷ i
-      }
-    → Array (HH.HTML p i)
-    )
+  | ActionComponentSpec ActionComponentView
+
+type NumberComponentView =
+  ∀ p i
+  . { color :: LazyColor
+    , input :: HH.HTML p i
+    }
+  → Array (HH.HTML p i)
+
+type TextComponentView =
+  ∀ p i
+  . { color :: LazyColor
+    , value :: Maybe InputTextValue
+    , onValueInput :: String -> i
+    , onBlur :: FocusEvent -> i
+    }
+  → Array (HH.HTML p i)
+
+type DragComponentView =
+  ∀ p i
+  . { color:: LazyColor
+    , onMouseDown :: MouseEvent -> i
+    , onTouchStart :: TouchEvent -> i
+    }
+  → Array (HH.HTML p i)
+
+type ActionComponentView =
+  ∀ p i
+  . { color ∷ ValueHistory LazyColor
+    , setColor ∷ Color → i
+    , commit ∷ i
+    }
+  → Array (HH.HTML p i)
+
+mapValueHistory :: ∀ a b. (a -> b) -> ValueHistory a -> ValueHistory b
+mapValueHistory f { current, old } = { current: f current, old: map f old }
+
+mkLazyColor :: Color -> LazyColor
+mkLazyColor color =
+  { color
+  , hsl: defer \_ -> Color.toHSLA color
+  , hsv: defer \_ -> Color.toHSVA color
+  , rgb: defer \_ -> Color.toRGBA color
+  , isLight: defer \_ -> Color.isLight color
+  }
 
 
 componentPreview ∷ Array H.ClassName -> ColorComponent
@@ -282,14 +287,6 @@ componentSaturationHSV classes = mkNumComponent
   classes
   confSaturation
 
-mapInputProps :: ∀ a b. (a -> b) -> InputProps a -> InputProps b
-mapInputProps f { root, label, elem, elemInvalid } =
-  { root: f root
-  , label: f label
-  , elem: f elem
-  , elemInvalid: f elemInvalid
-  }
-
 
 componentValue ∷ InputProps Classes → ColorComponent
 componentValue classes = mkNumComponent
@@ -363,15 +360,6 @@ renderInput {root, label, prefix, child} =
     [ HH.span [HP.classes label] [HH.text prefix]
     , child
     ]
-
-componentSL ∷ Array (InputProps Classes → ColorComponent)
-componentSL = [componentSaturationHSL, componentLightness]
-
-componentSV ∷ Array (InputProps Classes → ColorComponent)
-componentSV = [componentSaturationHSV, componentValue]
-
-componentRGB ∷ Array (InputProps Classes → ColorComponent)
-componentRGB = [componentRed, componentGreen, componentBlue]
 
 
 -- Internal helpers
