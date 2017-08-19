@@ -16,7 +16,7 @@ import ColorPicker.Halogen.Layout as L
 import ColorPicker.Halogen.Utils.Drag as Drag
 import Control.Monad.Aff.Class (class MonadAff)
 import DOM.Classy.Event (preventDefault)
-import Data.Array (head, index, mapWithIndex, nubBy)
+import Data.Array (index, mapWithIndex, nubBy)
 import Data.Either (Either(..), either)
 import Data.Either.Nested as Either
 import Data.Foldable (fold, foldr, for_)
@@ -170,13 +170,11 @@ eval = case _ of
     pure next
   Commit next → do
     state ← H.get
-    -- TODO disable Commit button if this condition is not true
-    when (Just state.color.current.color /= (map _.color $ head state.color.old)) do
-      H.put $ state{ color =
-        { current: state.color.current
-        , old: nubBy (\a b -> eq a.color b.color) $ [state.color.current] <> state.color.old
-        }}
-      H.raise $ NotifyChange state.color.current.color
+    H.put $ state{ color =
+      { current: state.color.current
+      , old: nubBy (\a b -> eq a.color b.color) $ [state.color.current] <> state.color.old
+      }}
+    H.raise $ NotifyChange state.color.current.color
     pure next
   UpdateCurrentColor color next → do
     state ← H.get

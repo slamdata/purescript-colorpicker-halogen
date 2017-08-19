@@ -43,7 +43,7 @@ import Color (Color)
 import Color as Color
 import Control.MonadZero (guard)
 import DOM.Event.Types (FocusEvent, MouseEvent, TouchEvent)
-import Data.Array (take)
+import Data.Array (head, take)
 import Data.Int (floor, toNumber)
 import Data.Lazy (Lazy, defer, force)
 import Data.Maybe (Maybe(..), maybe, maybe')
@@ -169,10 +169,11 @@ componentHistory classes = ActionComponentSpec \{ color , setColor } →
 
 
 componentSet ∷ Array H.ClassName -> ColorComponent
-componentSet classes = ActionComponentSpec \{ commit } → pure $
+componentSet classes = ActionComponentSpec \{ color: {current, old}, commit } → pure $
   HH.button
     [ HP.classes classes
     , HE.onClick $ const $ Just commit
+    , HP.disabled $ Just current.color == (map _.color $ head old)
     ]
     [ HH.text "Set" ]
 
