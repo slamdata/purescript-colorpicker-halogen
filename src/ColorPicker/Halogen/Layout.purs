@@ -88,7 +88,6 @@ type LazyColor =
   , hsl :: Lazy RecordHSLA
   , hsv :: Lazy RecordHSVA
   , rgb :: Lazy RecordRGBA
-  , isLight :: Lazy Boolean
   }
 
 type InputProps c =
@@ -157,7 +156,6 @@ mkLazyColor color =
   , hsl: defer \_ -> Color.toHSLA color
   , hsv: defer \_ -> Color.toHSVA color
   , rgb: defer \_ -> Color.toRGBA color
-  , isLight: defer \_ -> Color.isLight color
   }
 
 
@@ -199,9 +197,9 @@ componentDragSV ∷
   → ColorComponent
 componentDragSV classes = DragComponentSpec
   { update: \{x, y} → modifyHSV _{ s = x, v = 1.0 - y}
-  , view: \{color: {isLight, hsv, color}, onMouseDown, onTouchStart} -> pure $
+  , view: \{color: {hsv, color}, onMouseDown, onTouchStart} -> pure $
       HH.div
-        [ HP.classes $ classes.root <> if (force isLight) then classes.isLight else classes.isDark
+        [ HP.classes $ classes.root <> if Color.isLight color then classes.isLight else classes.isDark
         , HCSS.style $ CSS.backgroundColor $ Color.hsl (force hsv).h 1.0 0.5
         , HE.onTouchStart $ onTouchStart >>> Just
         , HE.onMouseDown $ onMouseDown >>> Just
@@ -225,7 +223,7 @@ componentDragHue ∷
   → ColorComponent
 componentDragHue classes = DragComponentSpec
   { update: \{y} → modifyHSL _{ h = (1.0 - y) * 360.0 }
-  , view: \{color: {isLight, hsv, color}, onMouseDown, onTouchStart} -> pure $
+  , view: \{color: {hsv, color}, onMouseDown, onTouchStart} -> pure $
       HH.div
         [ HP.classes classes.root
         , HE.onTouchStart $ onTouchStart >>> Just
