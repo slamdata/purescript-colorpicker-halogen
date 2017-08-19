@@ -4,22 +4,23 @@ import Prelude
 
 import Color (Color, rgb)
 import ColorPicker.Halogen.Component as CPicker
+import ColorPicker.Halogen.Layout as L
 import Control.Monad.Aff.Class (class MonadAff)
 import Control.Monad.Eff (Eff)
+import Control.MonadZero (guard)
+import Data.Array (reverse)
 import Data.Either.Nested as Either
 import Data.Functor.Coproduct.Nested as Coproduct
-import Data.Map (Map, fromFoldable, insert, lookup)
-import Data.Maybe (Maybe(..))
+import Data.Map (Map, insert, lookup)
+import Data.Maybe (Maybe(..), maybe')
 import Data.Monoid (mempty)
-import Data.Tuple (Tuple(..))
-import Halogen (ClassName(..))
 import Halogen as H
 import Halogen.Aff as HA
 import Halogen.Component.ChildPath as CP
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
+import Halogen.HTML.Properties as HP
 import Halogen.VDom.Driver (runUI)
-import ColorPicker.Halogen.ColorComponents as C
 
 main ∷ Eff (HA.HalogenEffects ()) Unit
 main = HA.runHalogenAff do
@@ -80,57 +81,101 @@ eval (HandleMsg idx msg next) = do
       _, CPicker.NotifyChange x →  {next: x, current: x}
 
 config0 ∷ CPicker.Props
-config0 = mkConf
-  [ClassName "ColorPicker--small"]
-  [ [C.componentHue] <> C.componentSL
-  ]
+config0 = mkConf $ L.Root c $ reverse l
+  where
+  L.Root c l = mkLayout
+    (H.ClassName "ColorPicker--small")
+    [ [ L.componentHue
+      , L.componentSaturationHSL
+      , L.componentLightness
+      ]
+    ]
 
 config1 ∷ CPicker.Props
-config1 = mkConf
-  [ClassName "ColorPicker--large"]
-  [ [C.componentHue] <> C.componentSV <> [C.componentHEX]
-  , C.componentRGB
+config1 = mkConf $ mkLayout
+  (H.ClassName "ColorPicker--large")
+  [ [ L.componentHue
+    , L.componentSaturationHSV
+    , L.componentValue
+    , L.componentSaturationHSL
+    , L.componentLightness
+    ]
+  , [ L.componentRed
+    , L.componentGreen
+    , L.componentBlue
+    , L.componentHEX
+    ]
   ]
 
 config2 ∷ CPicker.Props
-config2 = mkConf
-  [ClassName "ColorPicker--small"]
-  [[ componentRedORNoRed ]]
+config2 = mkConf $ mkLayout
+  (H.ClassName "ColorPicker--small")
+  [ [ const componentRedORNoRed ]]
 
-componentRedORNoRed ∷ C.ColorComponent
-componentRedORNoRed = C.TextComponentSpec
-  { fromString: \str → if str == "red" then Just (rgb 255 0 0) else Nothing
-  , toString: \color → if color == (rgb 255 0 0) then "red" else "nored"
-  , key: "Red"
-  , config:
-      { title: "red or nored?"
-      , prefix: "🛑"
-      , placeholder: "red"
-      }
+componentRedORNoRed ∷ L.PickerComponent
+componentRedORNoRed = L.TextComponentSpec
+  { fromString: \str → if str == "red" then Just (red) else Nothing
+  , view: \{color, value, onBlur, onValueInput } -> pure $
+      HH.label
+        [ HP.classes inputClasses.root]
+        [ HH.span [HP.classes inputClasses.label] [HH.text "🛑"]
+        , HH.input
+          [ HP.type_ HP.InputText
+          , HP.classes
+            $  inputClasses.elem
+            <> (guard (L.isInvalid value) *> (inputClasses.elemInvalid))
+          , HP.title "red or nored?"
+          , HP.value $ maybe' (\_ -> toString color) _.value value
+          , HP.placeholder "red"
+          , HE.onValueInput $ onValueInput >>> Just
+          , HE.onBlur $ onBlur >>> Just
+          ]
+        ]
   }
-mkConf ∷ Array ClassName → CPicker.ColorComponentGroups → CPicker.Props
-mkConf root editing =
-  { editing
-  , classes: fromFoldable
-    [ Tuple CPicker.Root $ [ClassName "ColorPicker"] <> root
-    , Tuple CPicker.Dragger [ClassName "ColorPicker-dragger"]
-    , Tuple CPicker.Field [ClassName "ColorPicker-field"]
-    , Tuple CPicker.FieldSelector [ClassName "ColorPicker-fieldSelector"]
-    , Tuple CPicker.Slider [ClassName "ColorPicker-slider"]
-    , Tuple CPicker.SliderSelector [ClassName "ColorPicker-sliderSelector"]
-    , Tuple CPicker.Aside [ClassName "ColorPicker-aside"]
-    , Tuple CPicker.Stage [ClassName "ColorPicker-stage"]
-    , Tuple CPicker.ColorBlockCurrent [ClassName "ColorPicker-colorBlockCurrent"]
-    , Tuple CPicker.ColorBlockNext [ClassName "ColorPicker-colorBlockNext"]
-    , Tuple CPicker.Editing [ClassName "ColorPicker-editing"]
-    , Tuple CPicker.EditingItem [ClassName "ColorPicker-editingItem"]
-    , Tuple CPicker.Input [ClassName "ColorPicker-input"]
-    , Tuple CPicker.InputLabel [ClassName "ColorPicker-inputLabel"]
-    , Tuple CPicker.InputElem [ClassName "ColorPicker-inputElem"]
-    , Tuple CPicker.InputElemInvalid [ClassName "ColorPicker-inputElem--invalid"]
-    , Tuple CPicker.Actions [ClassName "ColorPicker-actions"]
-    , Tuple CPicker.ActionSet [ClassName "ColorPicker-actionSet"]
-    , Tuple CPicker.IsLight [ClassName "IsLight"]
-    , Tuple CPicker.IsDark [ClassName "IsDark"]
+  where
+  red = rgb 255 0 0
+  toString =  \{color} → if color == red then "red" else "noRed"
+
+
+mkConf :: L.Layout -> CPicker.Props
+mkConf = { layout: _ }
+
+mkLayout
+  ∷ H.ClassName
+  → Array (Array (L.InputProps L.Classes → L.PickerComponent))
+  → L.Layout
+mkLayout root editGroups =
+  [ H.ClassName "ColorPicker", root ] `L.Root`
+    [ [ H.ClassName "ColorPicker-dragger" ] `L.Group`
+        [ L.Component $ L.componentDragSV
+            { root: [ H.ClassName "ColorPicker-field" ]
+            , isLight: [ H.ClassName "IsLight" ]
+            , isDark: [ H.ClassName "IsDark" ]
+            , selector: [ H.ClassName "ColorPicker-fieldSelector"]
+            }
+        , L.Component $ L.componentDragHue
+            { root: [ H.ClassName "ColorPicker-slider" ]
+            , selector: [ H.ClassName "ColorPicker-sliderSelector"]
+            }
+        ]
+    , [ H.ClassName "ColorPicker-aside" ] `L.Group`
+        [ [ H.ClassName "ColorPicker-stage" ] `L.Group`
+            [ L.Component $ L.componentPreview [ H.ClassName "ColorPicker-colorBlockCurrent" ]
+            , L.Component $ L.componentHistory 4 [ H.ClassName "ColorPicker-colorBlockOld" ]
+            ]
+        , L.Group [ H.ClassName "ColorPicker-editing" ] $
+            editGroups <#> \editGroup →
+              L.Group [ H.ClassName "ColorPicker-editingItem" ] $
+                editGroup <#> \mkItem -> L.Component $ mkItem inputClasses
+        , [ H.ClassName "ColorPicker-actions" ] `L.Group`
+            [ L.Component $ L.componentSet [ H.ClassName "ColorPicker-actionSet" ] ]
+        ]
     ]
+
+inputClasses ∷ L.InputProps L.Classes
+inputClasses =
+  { root: [H.ClassName "ColorPicker-input"]
+  , label: [H.ClassName "ColorPicker-inputLabel"]
+  , elem: [H.ClassName "ColorPicker-inputElem"]
+  , elemInvalid: [H.ClassName "ColorPicker-inputElem--invalid"]
   }

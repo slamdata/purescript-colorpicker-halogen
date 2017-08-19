@@ -152,7 +152,7 @@ nodeBoundingClientRect
   → Eff (dom ∷ DOM | r) DOMRect
 nodeBoundingClientRect node = fromMaybe
   (pure {left: 0.0, right: 0.0, top: 0.0, bottom: 0.0, width: 0.0, height: 0.0})
-  (getBoundingClientRect <$>elem)
+  (getBoundingClientRect <$> elem)
   where
   elem ∷ Maybe HTMLElement
   elem = fromNode node
