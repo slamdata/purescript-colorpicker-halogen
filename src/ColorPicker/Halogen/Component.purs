@@ -11,7 +11,7 @@ import Prelude
 
 import Color (Color)
 import Color as Color
-import ColorPicker.Halogen.Layout (Layout(..), ChildLayout(..), ColorComponent(..), InputTextValue, LazyColor, PositionUpdate, ValueHistory, mapValueHistory, mkLazyColor)
+import ColorPicker.Halogen.Layout (Layout(..), ChildLayout(..), PickerComponent(..), InputTextValue, LazyColor, PositionUpdate, ValueHistory, mapValueHistory, mkLazyColor)
 import ColorPicker.Halogen.Utils.Drag as Drag
 import Control.Monad.Aff.Class (class MonadAff)
 import DOM.Classy.Event (preventDefault)

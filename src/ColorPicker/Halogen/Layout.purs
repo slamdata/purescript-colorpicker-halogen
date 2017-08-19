@@ -1,7 +1,7 @@
 module ColorPicker.Halogen.Layout
   ( Layout(..)
   , ChildLayout(..)
-  , ColorComponent(..)
+  , PickerComponent(..)
 
   , NumberComponentView
   , TextComponentView
@@ -68,7 +68,7 @@ data Layout = Root (Array H.ClassName) (Array ChildLayout)
 
 data ChildLayout
   = Group (Array H.ClassName) (Array ChildLayout)
-  | Component ColorComponent
+  | Component PickerComponent
 
 
 type ValueHistory a =  { old ∷ Array a, current ∷ a }
@@ -98,7 +98,7 @@ type InputProps c =
   }
 
 
-data ColorComponent
+data PickerComponent
   = NumberComponentSpec
     { update ∷ Number → Dynamic (Maybe Color)
     , read ∷ Dynamic Number
@@ -159,7 +159,7 @@ mkLazyColor color =
   }
 
 
-componentPreview ∷ Array H.ClassName -> ColorComponent
+componentPreview ∷ Array H.ClassName -> PickerComponent
 componentPreview classes = ActionComponentSpec \{ color , setColor } → pure $
   HH.div
     [ HP.classes $ classes
@@ -167,7 +167,7 @@ componentPreview classes = ActionComponentSpec \{ color , setColor } → pure $
     , HCSS.style $ CSS.backgroundColor color.current.color
     ] []
 
-componentHistory ∷ Array H.ClassName -> ColorComponent
+componentHistory ∷ Array H.ClassName -> PickerComponent
 componentHistory classes = ActionComponentSpec \{ color , setColor } →
   take 4 color.old <#> \c ->
     HH.div
@@ -179,7 +179,7 @@ componentHistory classes = ActionComponentSpec \{ color , setColor } →
       ] []
 
 
-componentSet ∷ Array H.ClassName -> ColorComponent
+componentSet ∷ Array H.ClassName -> PickerComponent
 componentSet classes = ActionComponentSpec \{ color: {current, old}, commit } → pure $
   HH.button
     [ HP.classes classes
@@ -194,7 +194,7 @@ componentDragSV ∷
   , root ∷ Array H.ClassName
   , selector ∷ Array H.ClassName
   }
-  → ColorComponent
+  → PickerComponent
 componentDragSV classes = DragComponentSpec
   { update: \{x, y} → modifyHSV _{ s = x, v = 1.0 - y}
   , view: \{color: {hsv, color}, onMouseDown, onTouchStart} -> pure $
@@ -220,7 +220,7 @@ componentDragHue ∷
   { root ∷ Array H.ClassName
   , selector ∷ Array H.ClassName
   }
-  → ColorComponent
+  → PickerComponent
 componentDragHue classes = DragComponentSpec
   { update: \{y} → modifyHSL _{ h = (1.0 - y) * 360.0 }
   , view: \{color: {hsv, color}, onMouseDown, onTouchStart} -> pure $
@@ -242,7 +242,7 @@ mkNumComponent
   -> Dynamic Number
   -> InputProps Classes
   -> PreNumConf
-  -> ColorComponent
+  -> PickerComponent
 mkNumComponent update read classes conf = NumberComponentSpec
   { update
   , read
@@ -264,7 +264,7 @@ mkNumComponent update read classes conf = NumberComponentSpec
   }
 
 
-componentHue ∷ InputProps Classes → ColorComponent
+componentHue ∷ InputProps Classes → PickerComponent
 componentHue classes = mkNumComponent
   (\n → Just <<< modifyHSL (_{h = n}))
   (\({rgb, hsv, hsl}) → roundFractionalNum (force hsl).h)
@@ -272,21 +272,21 @@ componentHue classes = mkNumComponent
   confHue
 
 
-componentSaturationHSL ∷ InputProps Classes → ColorComponent
+componentSaturationHSL ∷ InputProps Classes → PickerComponent
 componentSaturationHSL classes = mkNumComponent
   (\n → Just <<< modifyHSL (_{s = n / 100.0}))
   (\({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * (force hsl).s)
   classes
   confSaturation
 
-componentLightness ∷ InputProps Classes → ColorComponent
+componentLightness ∷ InputProps Classes → PickerComponent
 componentLightness classes = mkNumComponent
   (\n → Just <<< modifyHSL (_{l = n / 100.0}))
   (\({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * (force hsl).l)
   classes
   confLightness
 
-componentSaturationHSV ∷ InputProps Classes → ColorComponent
+componentSaturationHSV ∷ InputProps Classes → PickerComponent
 componentSaturationHSV classes = mkNumComponent
   (\n → Just <<< modifyHSV (_{s = n / 100.0}))
   (\({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * (force hsv).s)
@@ -294,35 +294,35 @@ componentSaturationHSV classes = mkNumComponent
   confSaturation
 
 
-componentValue ∷ InputProps Classes → ColorComponent
+componentValue ∷ InputProps Classes → PickerComponent
 componentValue classes = mkNumComponent
   (\n → Just <<< modifyHSV (_{v = n / 100.0}))
   (\({rgb, hsv, hsl}) → roundFractionalNum $ 100.0 * (force hsv).v)
   classes
   confValue
 
-componentRed ∷ InputProps Classes → ColorComponent
+componentRed ∷ InputProps Classes → PickerComponent
 componentRed classes = mkNumComponent
   (\n → Just <<< modifyRGB (_{r = asInt n}))
   (\({rgb, hsv, hsl}) → roundNum $ toNumber (force rgb).r)
   classes
   confRed
 
-componentGreen ∷ InputProps Classes → ColorComponent
+componentGreen ∷ InputProps Classes → PickerComponent
 componentGreen classes = mkNumComponent
   (\n → Just <<< modifyRGB (_{g = asInt n}))
   (\({rgb, hsv, hsl}) → roundNum $ toNumber (force rgb).g)
   classes
   confGreen
 
-componentBlue ∷ InputProps Classes → ColorComponent
+componentBlue ∷ InputProps Classes → PickerComponent
 componentBlue classes = mkNumComponent
   (\n → Just <<< modifyRGB (_{b = asInt n}))
   (\({rgb, hsv, hsl}) → roundNum $ toNumber (force rgb).b)
   classes
   confBlue
 
-componentHEX ∷ InputProps Classes → ColorComponent
+componentHEX ∷ InputProps Classes → PickerComponent
 componentHEX classes = TextComponentSpec
   { fromString: \str → Color.fromHexString $ "#" <> str
   , view: \{color, value, onValueInput, onBlur} -> pure $

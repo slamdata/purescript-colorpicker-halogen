@@ -112,7 +112,7 @@ config2 = mkConf $ mkLayout
   (H.ClassName "ColorPicker--small")
   [ [ const componentRedORNoRed ]]
 
-componentRedORNoRed ∷ L.ColorComponent
+componentRedORNoRed ∷ L.PickerComponent
 componentRedORNoRed = L.TextComponentSpec
   { fromString: \str → if str == "red" then Just (red) else Nothing
   , view: \{color, value, onBlur, onValueInput } -> pure $
@@ -142,7 +142,7 @@ mkConf = { layout: _ }
 
 mkLayout
   ∷ H.ClassName
-  → Array (Array (L.InputProps L.Classes → L.ColorComponent))
+  → Array (Array (L.InputProps L.Classes → L.PickerComponent))
   → L.Layout
 mkLayout root editGroups =
   [ H.ClassName "ColorPicker", root ] `L.Root`
