@@ -132,7 +132,7 @@ componentRedORNoRed = L.TextComponentSpec
   }
   where
   red = rgb 255 0 0
-  toString =  \{color} → if color == red then "red" else "noRed"
+  toString = \color → if color == red then "red" else "noRed"
 
 
 mkConf ∷ L.Layout → CPicker.Props

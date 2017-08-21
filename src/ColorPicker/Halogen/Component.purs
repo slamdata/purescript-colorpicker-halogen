@@ -11,11 +11,11 @@ import Prelude
 
 import Color (Color)
 import Color as Color
-import ColorPicker.Halogen.Layout (Layout(..), ChildLayout(..), PickerComponent(..), InputTextValue, LazyColor, PositionUpdate, ValueHistory, mapValueHistory, mkLazyColor)
+import ColorPicker.Halogen.Layout (ChildLayout(..), InputTextValue, Layout(..), PickerComponent(..), PositionUpdate, ValueHistory)
 import ColorPicker.Halogen.Utils.Drag as Drag
 import Control.Monad.Aff.Class (class MonadAff)
 import DOM.Classy.Event (preventDefault)
-import Data.Array (index, mapWithIndex, nubBy)
+import Data.Array (index, mapWithIndex, nub)
 import Data.Either (Either(..), either)
 import Data.Either.Nested as Either
 import Data.Foldable (fold, foldr, for_)
@@ -35,7 +35,7 @@ import Halogen.Query.HalogenM (halt)
 import NumberInput.Halogen.Component as Num
 
 type State =
-  { color ∷ ValueHistory LazyColor
+  { color ∷ ValueHistory Color
   , inputValues ∷ Map Cursor InputTextValue
   , props ∷ Props
   }
@@ -78,7 +78,7 @@ initialColor = Color.hsl 0.0 0.0 0.0
 picker ∷ ∀ m r. MonadAff (PickerEffects r) m ⇒ H.Component HH.HTML Query Props Message m
 picker = H.lifecycleParentComponent
   { initialState:
-      { color: { current: mkLazyColor initialColor, old: [] }
+      { color: { current: initialColor, old: [] }
       , inputValues: mempty
       , props: _ }
   , render
@@ -159,9 +159,9 @@ eval = case _ of
       _ → pure unit
     pure next
   SetValue val next → do
-    H.modify _{ color = mapValueHistory mkLazyColor val }
+    H.modify _{ color = val }
     pure next
-  GetValue next → H.gets $ _.color >>> mapValueHistory _.color >>> next
+  GetValue next → H.gets $ _.color >>> next
   Init next → do
     propagate
     pure next
@@ -170,10 +170,10 @@ eval = case _ of
     H.put $ state
       { color =
         { current: state.color.current
-        , old: nubBy (\a b → eq a.color b.color) $ [state.color.current] <> state.color.old
+        , old: nub $ [state.color.current] <> state.color.old
         }
       }
-    H.raise $ NotifyChange state.color.current.color
+    H.raise $ NotifyChange state.color.current
     pure next
   UpdateCurrentColor color next → do
     state ← H.get
@@ -199,7 +199,7 @@ eval = case _ of
 
 updateColor ∷ ∀ m. State → Color → DSL m Unit
 updateColor state colorNext = do
-  H.put state{ color { current = mkLazyColor colorNext } }
+  H.put state{ color { current = colorNext } }
   H.raise $ NextChange colorNext
   propagate
 
@@ -212,10 +212,10 @@ propagate = do
     List.Nil
     layout
   where
-  propagateLayout ∷ LazyColor → Cursor → Layout → DSL m Unit
+  propagateLayout ∷ Color → Cursor → Layout → DSL m Unit
   propagateLayout color cursor = case _ of
     Root _ l → void $ sequence $ mapWithIndex (\idx → propagateChildLayout color (List.Cons idx cursor)) l
-  propagateChildLayout ∷ LazyColor → Cursor → ChildLayout → DSL m Unit
+  propagateChildLayout ∷ Color → Cursor → ChildLayout → DSL m Unit
   propagateChildLayout color cursor = case _ of
     Group _ l → void $ sequence $ mapWithIndex (\idx → propagateChildLayout color (List.Cons idx cursor)) l
     Component c → case c of
