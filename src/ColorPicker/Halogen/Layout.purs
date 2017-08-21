@@ -13,7 +13,7 @@ module ColorPicker.Halogen.Layout
   , isInvalid
 
   , PositionUpdate
-  , PreNumConf
+  , NumConf
   , InputProps
   , Classes
   , ValueHistory
@@ -74,7 +74,7 @@ type PositionUpdate = { x ∷ Number, y ∷ Number } → Color → Color
 
 type Classes = Array H.ClassName
 
-type PreNumConf = { prefix ∷ String, title ∷ String, placeholder ∷ String, range ∷ Range Number }
+type NumConf = { prefix ∷ String, title ∷ String, placeholder ∷ String, range ∷ Range Number }
 
 type InputProps c =
   { root ∷ c
@@ -217,7 +217,7 @@ mkNumComponent
   ∷ (Number → Color → Maybe Color)
   → (Color → Number)
   → InputProps Classes
-  → PreNumConf
+  → NumConf
   → PickerComponent
 mkNumComponent update read classes conf = NumberComponentSpec
   { update
@@ -347,7 +347,7 @@ renderInput {root, label, prefix, child} =
 -- Internal helpers
 
 
-confRed ∷ PreNumConf
+confRed ∷ NumConf
 confRed =
   { title: "Red"
   , placeholder: "R"
@@ -355,7 +355,7 @@ confRed =
   , range: MinMax 0.0 256.0
   }
 
-confGreen ∷ PreNumConf
+confGreen ∷ NumConf
 confGreen =
   { title: "Green"
   , placeholder: "G"
@@ -363,7 +363,7 @@ confGreen =
   , range: MinMax 0.0 256.0
   }
 
-confBlue ∷ PreNumConf
+confBlue ∷ NumConf
 confBlue =
   { title: "Blue"
   , placeholder: "B"
@@ -371,21 +371,21 @@ confBlue =
   , range: MinMax 0.0 256.0
   }
 
-confHue ∷ PreNumConf
+confHue ∷ NumConf
 confHue =
   { title: "Hue"
   , placeholder: "H"
   , prefix: "H"
   , range: MinMax 0.0 360.0
   }
-confSaturation ∷ PreNumConf
+confSaturation ∷ NumConf
 confSaturation =
   { title: "Saturation"
   , placeholder: "S"
   , prefix: "S"
   , range: MinMax 0.0 100.0
   }
-confLightness ∷ PreNumConf
+confLightness ∷ NumConf
 confLightness =
   { title: "Lightness"
   , placeholder: "L"
@@ -393,7 +393,7 @@ confLightness =
   , range: MinMax 0.0 100.0
   }
 
-confValue ∷ PreNumConf
+confValue ∷ NumConf
 confValue =
   { title: "Value"
   , placeholder: "V"
