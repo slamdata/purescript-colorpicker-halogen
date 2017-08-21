@@ -59,8 +59,11 @@ import Math (round)
 import NumberInput.Halogen.Component as Num
 import NumberInput.Range (Range(..))
 
+-- We have two types for Layout as in halogen render can not return
+-- Array of HTML nodes, so by asking for `Layout` in Props, we can
+-- have allow only one node for as root node, but allow `PickerComponent`-s
+-- to return Array of HTML nodes.
 data Layout = Root (Array H.ClassName) (Array ChildLayout)
-
 data ChildLayout
   = Group (Array H.ClassName) (Array ChildLayout)
   | Component PickerComponent
