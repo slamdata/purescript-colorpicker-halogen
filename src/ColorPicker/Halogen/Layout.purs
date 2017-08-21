@@ -21,7 +21,6 @@ module ColorPicker.Halogen.Layout
   , RecordHSVA
   , RecordRGBA
 
-
   , componentHue
   , componentSaturationHSL
   , componentLightness
