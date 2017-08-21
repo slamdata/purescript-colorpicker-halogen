@@ -143,13 +143,13 @@ componentPreview classes = ActionComponentSpec \{ color , setColor } → pure $
 
 componentHistory ∷ Int → Array H.ClassName → PickerComponent
 componentHistory historySize classes = ActionComponentSpec \{ color , setColor } →
-  take historySize color.old <#> \color →
+  take historySize color.old <#> \c →
     HH.div
       [ HP.tabIndex 0
       , HP.classes $ classes
       , HP.title "Old value"
-      , HE.onClick $ const $ Just $ setColor color
-      , HCSS.style $ CSS.backgroundColor color
+      , HE.onClick $ const $ Just $ setColor c
+      , HCSS.style $ CSS.backgroundColor c
       ] []
 
 

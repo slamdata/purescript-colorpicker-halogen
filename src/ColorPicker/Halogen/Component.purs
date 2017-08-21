@@ -135,7 +135,6 @@ eval ∷ ∀ m r. MonadAff (PickerEffects r) m ⇒ Query ~> DSL m
 eval = case _ of
   TextComponentBlur cursor next → do
     state ← H.get
-    let val = lookup cursor state.inputValues
     for_ (lookup cursor state.inputValues) \val →
       when val.isValid $ H.modify _ { inputValues = mempty ∷ Map Cursor InputTextValue }
     pure next
