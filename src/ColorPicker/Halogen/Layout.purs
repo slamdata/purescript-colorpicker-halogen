@@ -72,15 +72,13 @@ type InputTextValue = { value ∷ String, isValid ∷ Boolean }
 
 type PositionUpdate = { x ∷ Number, y ∷ Number } → Color → Color
 
-type Classes = Array H.ClassName
-
 type NumConf = { prefix ∷ String, title ∷ String, placeholder ∷ String, range ∷ Range Number }
 
-type InputProps c =
-  { root ∷ c
-  , label ∷ c
-  , elem ∷ c
-  , elemInvalid ∷ c
+type InputProps =
+  { root ∷ Array H.ClassName
+  , label ∷ Array H.ClassName
+  , elem ∷ Array H.ClassName
+  , elemInvalid ∷ Array H.ClassName
   }
 
 data PickerComponent
@@ -216,7 +214,7 @@ componentDragHue classes = DragComponentSpec
 mkNumComponent
   ∷ (Number → Color → Maybe Color)
   → (Color → Number)
-  → InputProps Classes
+  → InputProps
   → NumConf
   → PickerComponent
 mkNumComponent update read classes conf = NumberComponentSpec
@@ -240,65 +238,65 @@ mkNumComponent update read classes conf = NumberComponentSpec
   }
 
 
-componentHue ∷ InputProps Classes → PickerComponent
+componentHue ∷ InputProps → PickerComponent
 componentHue classes = mkNumComponent
-  (\n → Just <<< modifyHSL (_{h = n}))
+  (\n → Just <<< modifyHSL _{h = n})
   (\color → roundFractionalNum (Color.toHSLA color).h)
   classes
   confHue
 
 
-componentSaturationHSL ∷ InputProps Classes → PickerComponent
+componentSaturationHSL ∷ InputProps → PickerComponent
 componentSaturationHSL classes = mkNumComponent
-  (\n → Just <<< modifyHSL (_{s = n / 100.0}))
+  (\n → Just <<< modifyHSL _{s = n / 100.0})
   (\color → roundFractionalNum $ 100.0 * (Color.toHSLA color).s)
   classes
   confSaturation
 
-componentLightness ∷ InputProps Classes → PickerComponent
+componentLightness ∷ InputProps → PickerComponent
 componentLightness classes = mkNumComponent
-  (\n → Just <<< modifyHSL (_{l = n / 100.0}))
+  (\n → Just <<< modifyHSL _{l = n / 100.0})
   (\color → roundFractionalNum $ 100.0 * (Color.toHSLA color).l)
   classes
   confLightness
 
-componentSaturationHSV ∷ InputProps Classes → PickerComponent
+componentSaturationHSV ∷ InputProps → PickerComponent
 componentSaturationHSV classes = mkNumComponent
-  (\n → Just <<< modifyHSV (_{s = n / 100.0}))
+  (\n → Just <<< modifyHSV _{s = n / 100.0})
   (\color → roundFractionalNum $ 100.0 * (Color.toHSVA color).s)
   classes
   confSaturation
 
 
-componentValue ∷ InputProps Classes → PickerComponent
+componentValue ∷ InputProps → PickerComponent
 componentValue classes = mkNumComponent
-  (\n → Just <<< modifyHSV (_{v = n / 100.0}))
+  (\n → Just <<< modifyHSV _{v = n / 100.0})
   (\color → roundFractionalNum $ 100.0 * (Color.toHSVA color).v)
   classes
   confValue
 
-componentRed ∷ InputProps Classes → PickerComponent
+componentRed ∷ InputProps → PickerComponent
 componentRed classes = mkNumComponent
-  (\n → Just <<< modifyRGB (_{r = asInt n}))
+  (\n → Just <<< modifyRGB _{r = asInt n})
   (\color → roundNum $ toNumber (Color.toRGBA color).r)
   classes
   confRed
 
-componentGreen ∷ InputProps Classes → PickerComponent
+componentGreen ∷ InputProps → PickerComponent
 componentGreen classes = mkNumComponent
-  (\n → Just <<< modifyRGB (_{g = asInt n}))
+  (\n → Just <<< modifyRGB _{g = asInt n})
   (\color → roundNum $ toNumber (Color.toRGBA color).g)
   classes
   confGreen
 
-componentBlue ∷ InputProps Classes → PickerComponent
+componentBlue ∷ InputProps → PickerComponent
 componentBlue classes = mkNumComponent
-  (\n → Just <<< modifyRGB (_{b = asInt n}))
+  (\n → Just <<< modifyRGB _{b = asInt n})
   (\color → roundNum $ toNumber (Color.toRGBA color).b)
   classes
   confBlue
 
-componentHEX ∷ InputProps Classes → PickerComponent
+componentHEX ∷ InputProps → PickerComponent
 componentHEX classes = TextComponentSpec
   { fromString: \str → Color.fromHexString $ "#" <> str
   , view: \{color, value, onValueInput, onBlur} → pure $
