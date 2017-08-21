@@ -12,7 +12,7 @@ import Data.Array (reverse)
 import Data.Either.Nested as Either
 import Data.Functor.Coproduct.Nested as Coproduct
 import Data.Map (Map, insert, lookup)
-import Data.Maybe (Maybe(..), maybe')
+import Data.Maybe (Maybe(..), maybe)
 import Data.Monoid (mempty)
 import Halogen as H
 import Halogen.Aff as HA
@@ -34,10 +34,8 @@ type ColorIdx = Int
 type ChildQuery = Coproduct.Coproduct1 CPicker.Query
 type Slot = Either.Either1 ColorIdx
 
-
 cpColor ∷ CP.ChildPath CPicker.Query ChildQuery ColorIdx Slot
 cpColor = CP.cp1
-
 
 type HTML m = H.ParentHTML Query ChildQuery Slot m
 type DSL m = H.ParentDSL State Query ChildQuery Slot Void m
@@ -114,7 +112,7 @@ config2 = mkConf $ mkLayout
 
 componentRedORNoRed ∷ L.PickerComponent
 componentRedORNoRed = L.TextComponentSpec
-  { fromString: \str → if str == "red" then Just (red) else Nothing
+  { fromString: \str → guard (str == "red") $> red
   , view: \{color, value, onBlur, onValueInput } → pure $
       HH.label
         [ HP.classes inputClasses.root]
@@ -125,7 +123,7 @@ componentRedORNoRed = L.TextComponentSpec
             $  inputClasses.elem
             <> (guard (L.isInvalid value) *> (inputClasses.elemInvalid))
           , HP.title "red or nored?"
-          , HP.value $ maybe' (\_ → toString color) _.value value
+          , HP.value $ maybe (toString color) _.value value
           , HP.placeholder "red"
           , HE.onValueInput $ onValueInput >>> Just
           , HE.onBlur $ onBlur >>> Just
