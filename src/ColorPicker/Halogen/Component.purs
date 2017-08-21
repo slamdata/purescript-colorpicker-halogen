@@ -22,7 +22,7 @@ import Data.Foldable (fold, foldr, for_)
 import Data.Functor.Coproduct.Nested as Coproduct
 import Data.List as List
 import Data.Map (Map, insert, lookup)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), isJust)
 import Data.Monoid (mempty)
 import Data.Traversable (sequence)
 import Halogen (liftEff)
@@ -140,14 +140,16 @@ eval = case _ of
       when val.isValid $ H.modify _ { inputValues = mempty ∷ Map Cursor InputTextValue }
     pure next
   TextComponentUpdate cursor fromString str next → do
-    let
-      color = fromString str
-      isValid = case color of
-        Nothing → false
-        Just _ → true
+    let color = fromString str
     state ← H.get
-    let state' = state { inputValues = insert cursor {isValid, value: str} state.inputValues }
-    for_ color $ updateColor state'
+    for_ color $ updateColor $ state
+      { inputValues = insert
+          cursor
+          { isValid: isJust color
+          , value: str
+          }
+          state.inputValues
+      }
     pure next
   NumberComponentUpdate cursor num next → do
     state ← H.get
@@ -157,19 +159,20 @@ eval = case _ of
       _ → pure unit
     pure next
   SetValue val next → do
-    state ← H.get
-    H.put $ state{ color = mapValueHistory mkLazyColor val }
+    H.modify _{ color = mapValueHistory mkLazyColor val }
     pure next
-  GetValue next → H.get <#> (_.color >>> (mapValueHistory _.color) >>> next)
+  GetValue next → H.gets $ _.color >>> mapValueHistory _.color >>> next
   Init next → do
     propagate
     pure next
   Commit next → do
     state ← H.get
-    H.put $ state{ color =
-      { current: state.color.current
-      , old: nubBy (\a b → eq a.color b.color) $ [state.color.current] <> state.color.old
-      }}
+    H.put $ state
+      { color =
+        { current: state.color.current
+        , old: nubBy (\a b → eq a.color b.color) $ [state.color.current] <> state.color.old
+        }
+      }
     H.raise $ NotifyChange state.color.current.color
     pure next
   UpdateCurrentColor color next → do
