@@ -140,7 +140,7 @@ mkConf = { layout: _ }
 
 mkLayout
   ∷ H.ClassName
-  → Array (Array (L.InputProps L.Classes → L.PickerComponent))
+  → Array (Array (L.InputProps → L.PickerComponent))
   → L.Layout
 mkLayout root editGroups =
   [ H.ClassName "ColorPicker", root ] `L.Root`
@@ -170,7 +170,7 @@ mkLayout root editGroups =
         ]
     ]
 
-inputClasses ∷ L.InputProps L.Classes
+inputClasses ∷ L.InputProps
 inputClasses =
   { root: [H.ClassName "ColorPicker-input"]
   , label: [H.ClassName "ColorPicker-inputLabel"]

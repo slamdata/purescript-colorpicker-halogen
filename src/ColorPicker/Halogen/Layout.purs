@@ -15,7 +15,6 @@ module ColorPicker.Halogen.Layout
   , PositionUpdate
   , NumConf
   , InputProps
-  , Classes
   , ValueHistory
 
   , RecordHSLA
@@ -333,8 +332,8 @@ isInvalid = not isValid
 renderInput ∷ ∀ i p.
   { child ∷ HH.HTML i p
   , prefix ∷ String
-  , label ∷ Classes
-  , root ∷ Classes
+  , label ∷ Array H.ClassName
+  , root ∷ Array H.ClassName
   }
   → HH.HTML i p
 renderInput {root, label, prefix, child} =
