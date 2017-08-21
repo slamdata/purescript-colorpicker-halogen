@@ -76,14 +76,12 @@ type Classes = Array H.ClassName
 
 type PreNumConf = { prefix ∷ String, title ∷ String, placeholder ∷ String, range ∷ Range Number }
 
-
 type InputProps c =
   { root ∷ c
   , label ∷ c
   , elem ∷ c
   , elemInvalid ∷ c
   }
-
 
 data PickerComponent
   = NumberComponentSpec
@@ -164,11 +162,12 @@ componentSet classes = ActionComponentSpec \{ color: {current, old}, commit } �
     ]
     [ HH.text "Set" ]
 
-componentDragSV ∷
+componentDragSV ∷ ∀ r.
   { isLight ∷ Array H.ClassName
   , isDark ∷ Array H.ClassName
   , root ∷ Array H.ClassName
   , selector ∷ Array H.ClassName
+  | r
   }
   → PickerComponent
 componentDragSV classes = DragComponentSpec
@@ -192,9 +191,10 @@ componentDragSV classes = DragComponentSpec
     }
 
 
-componentDragHue ∷
+componentDragHue ∷ ∀ r.
   { root ∷ Array H.ClassName
   , selector ∷ Array H.ClassName
+  | r
   }
   → PickerComponent
 componentDragHue classes = DragComponentSpec
