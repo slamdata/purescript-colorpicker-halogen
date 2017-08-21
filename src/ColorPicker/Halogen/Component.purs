@@ -42,11 +42,9 @@ type State =
 
 data Message = NextChange Color | NotifyChange Color
 
-
 type Props =
   { layout ∷ Layout
   }
-
 
 data Query a
   = SetProps Props a
@@ -68,12 +66,11 @@ type Slot = Either.Either1 Cursor
 cpNumComponent ∷ CP.ChildPath (Num.Query Number) ChildQuery Cursor Slot
 cpNumComponent = CP.cp1
 
-
 type HTML m = H.ParentHTML Query ChildQuery Slot m
-
 type DSL m = H.ParentDSL State Query ChildQuery Slot Message m
 
 type PickerEffects r = Drag.DragEffects r
+
 
 initialColor ∷ Color
 initialColor = Color.hsl 0.0 0.0 0.0
