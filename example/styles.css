@@ -1,6 +1,6 @@
 .ColorPicker {
   padding: 0.3em;
-  display: inline-flex;
+  display: flex;
   background: hsl(0, 0%, 80%);
 }
 
@@ -74,6 +74,7 @@
 .ColorPicker-aside {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
 }
 
 .ColorPicker-stage {
@@ -122,6 +123,7 @@
 .ColorPicker-editingItem {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
 }
 
 .ColorPicker-input {
@@ -134,6 +136,7 @@
   display: block;
   text-align: center;
   align-self: center;
+  flex: 1 1 auto;
 }
 
 .ColorPicker-inputElem,
