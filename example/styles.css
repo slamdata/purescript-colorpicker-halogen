@@ -126,7 +126,6 @@
 
 .ColorPicker-input {
   display: flex;
-  height: 1.5em;
   margin: 0.2em;
 }
 
@@ -137,10 +136,12 @@
   align-self: center;
 }
 
-.ColorPicker-inputElem {
-  border: solid 0.1em;
+.ColorPicker-inputElem,
+.ColorPicker-actionSet {
+  border: solid 1px;
   padding: 0.3em;
   width: 5em;
+  box-sizing: border-box;
 }
 
 .ColorPicker-inputElem--invalid {
@@ -151,12 +152,6 @@
   display: flex;
   justify-content: flex-end;
   margin: 0.2em;
-}
-
-.ColorPicker-actionSet {
-  height: 2em;
-  border: 0.1em solid;
-  width: 6em;
 }
 
 .ColorPicker-actionSet:active {
