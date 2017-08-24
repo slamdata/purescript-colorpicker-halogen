@@ -52,6 +52,7 @@ data Query a
   | DragMove PositionUpdate Drag.DragEvent a
   | UpdateCurrentColor Color a
   | NumberComponentUpdate Cursor (Maybe Number) a
+  | IntComponentUpdate Cursor (Maybe Int) a
   | TextComponentUpdate Cursor (String → Maybe Color) String a
   | TextComponentBlur Cursor a
   | Commit a
@@ -60,11 +61,14 @@ data Query a
   | SetValue (ValueHistory Color) a
 
 
-type ChildQuery = Coproduct.Coproduct1 (Num.Query Number)
-type Slot = Either.Either1 Cursor
+type ChildQuery = Coproduct.Coproduct2 (Num.Query Number) (Num.Query Int)
+type Slot = Either.Either2 Cursor Cursor
 
-cpNumComponent ∷ CP.ChildPath (Num.Query Number) ChildQuery Cursor Slot
-cpNumComponent = CP.cp1
+cpNumberComponent ∷ CP.ChildPath (Num.Query Number) ChildQuery Cursor Slot
+cpNumberComponent = CP.cp1
+
+cpIntComponent ∷ CP.ChildPath (Num.Query Int) ChildQuery Cursor Slot
+cpIntComponent = CP.cp2
 
 type HTML m = H.ParentHTML Query ChildQuery Slot m
 type DSL m = H.ParentDSL State Query ChildQuery Slot Message m
@@ -117,11 +121,20 @@ renderLayout state@{ color, inputValues, props} cursor = case _ of
     NumberComponentSpec spec → spec.view
       { color: color.current
       , input: HH.slot'
-          cpNumComponent
+          cpNumberComponent
           cursor
           Num.input
           spec.props
           (HE.input \(Num.NotifyChange val) → NumberComponentUpdate cursor val)
+      }
+    IntComponentSpec spec → spec.view
+      { color: color.current
+      , input: HH.slot'
+          cpIntComponent
+          cursor
+          Num.input
+          spec.props
+          (HE.input \(Num.NotifyChange val) → IntComponentUpdate cursor val)
       }
     TextComponentSpec spec → spec.view
       { color: color.current
@@ -154,6 +167,13 @@ eval = case _ of
     state ← H.get
     case focus cursor state.props.layout of
       Just (Component (NumberComponentSpec { update })) →
+        for_ (update <$> num >>= (_ $ state.color.current)) $ updateColor state
+      _ → pure unit
+    pure next
+  IntComponentUpdate cursor num next → do
+    state ← H.get
+    case focus cursor state.props.layout of
+      Just (Component (IntComponentSpec { update })) →
         for_ (update <$> num >>= (_ $ state.color.current)) $ updateColor state
       _ → pure unit
     pure next
@@ -222,7 +242,9 @@ propagate = do
       TextComponentSpec _ → pure unit
       ActionComponentSpec _ → pure unit
       NumberComponentSpec { read } →
-        H.query' cpNumComponent cursor (H.action $ Num.SetValue $ Just $ read color) >>= mustBeMounted
+        H.query' cpNumberComponent cursor (H.action $ Num.SetValue $ Just $ read color) >>= mustBeMounted
+      IntComponentSpec { read } →
+        H.query' cpIntComponent cursor (H.action $ Num.SetValue $ Just $ read color) >>= mustBeMounted
 
 mustBeMounted ∷ ∀ s f g p o m a. Maybe a → H.HalogenM s f g p o m a
 mustBeMounted (Just x) = pure x

@@ -2,8 +2,9 @@ module ColorPicker.Halogen.Layout
   ( Layout(..)
   , ChildLayout(..)
   , PickerComponent(..)
+  , NumComponentSpec
 
-  , NumberComponentView
+  , NumComponentView
   , TextComponentView
   , DragComponentView
   , ActionComponentView
@@ -45,7 +46,6 @@ import Color as Color
 import Control.MonadZero (guard)
 import DOM.Event.Types (FocusEvent, MouseEvent, TouchEvent)
 import Data.Array (head, take)
-import Data.Int (floor, toNumber)
 import Data.Maybe (Maybe(..), maybe, maybe')
 import Data.String as String
 import Halogen as H
@@ -73,7 +73,7 @@ type InputTextValue = { value ∷ String, isValid ∷ Boolean }
 
 type PositionUpdate = { x ∷ Number, y ∷ Number } → Color → Color
 
-type NumConf = { prefix ∷ String, title ∷ String, placeholder ∷ String, range ∷ Range Number }
+type NumConf a = { prefix ∷ String, title ∷ String, placeholder ∷ String, range ∷ Range a }
 
 type InputProps =
   { root ∷ Array H.ClassName
@@ -83,12 +83,8 @@ type InputProps =
   }
 
 data PickerComponent
-  = NumberComponentSpec
-    { update ∷ Number → Color → Maybe Color
-    , read ∷ Color → Number
-    , props ∷ Num.Props Number
-    , view ∷ NumberComponentView
-    }
+  = NumberComponentSpec (NumComponentSpec Number)
+  | IntComponentSpec (NumComponentSpec Int)
   | TextComponentSpec
     { fromString ∷ String → Maybe Color
     , view ∷ TextComponentView
@@ -99,7 +95,14 @@ data PickerComponent
     }
   | ActionComponentSpec ActionComponentView
 
-type NumberComponentView =
+type NumComponentSpec a =
+  { update ∷ a → Color → Maybe Color
+  , read ∷ Color → a
+  , props ∷ Num.Props a
+  , view ∷ NumComponentView
+  }
+
+type NumComponentView =
   ∀ p i
   . { color ∷ Color
     , input ∷ HH.HTML p i
@@ -212,17 +215,23 @@ componentDragHue classes = DragComponentSpec
     }
 
 mkNumComponent
-  ∷ (Number → Color → Maybe Color)
-  → (Color → Number)
+  :: ∀ a
+  . (a → Color → Maybe Color)
+  → (Color → a)
   → InputProps
-  → NumConf
-  → PickerComponent
-mkNumComponent update read classes conf = NumberComponentSpec
+  → NumConf a
+  → Num.HasNumberInputValue a
+  → { update :: a → Color → Maybe Color
+    , read :: Color → a
+    , props :: Num.Props a
+    , view :: NumComponentView
+    }
+mkNumComponent update read classes conf hasNumVal =
   { update
   , read
   , props:
     { title: conf.title
-    , hasNumberValue: hasValRound
+    , hasNumberValue: hasNumVal
     , placeholder: conf.placeholder
     , range: conf.range
     , root: classes.elem
@@ -237,9 +246,27 @@ mkNumComponent update read classes conf = NumberComponentSpec
       }
   }
 
+mkNumberComponent
+  ∷ (Number → Color → Maybe Color)
+  → (Color → Number)
+  → InputProps
+  → NumConf Number
+  → PickerComponent
+mkNumberComponent update read classes conf = NumberComponentSpec $
+  mkNumComponent update read classes conf hasValRound
+
+mkIntComponent
+  ∷ (Int → Color → Maybe Color)
+  → (Color → Int)
+  → InputProps
+  → NumConf Int
+  → PickerComponent
+mkIntComponent update read classes conf = IntComponentSpec $
+  mkNumComponent update read classes conf Num.intHasNumberInputValue
+
 
 componentHue ∷ InputProps → PickerComponent
-componentHue classes = mkNumComponent
+componentHue classes = mkNumberComponent
   (\n → Just <<< modifyHSL _{h = n})
   (\color → roundFractionalNum (Color.toHSLA color).h)
   classes
@@ -247,21 +274,21 @@ componentHue classes = mkNumComponent
 
 
 componentSaturationHSL ∷ InputProps → PickerComponent
-componentSaturationHSL classes = mkNumComponent
+componentSaturationHSL classes = mkNumberComponent
   (\n → Just <<< modifyHSL _{s = n / 100.0})
   (\color → roundFractionalNum $ 100.0 * (Color.toHSLA color).s)
   classes
   confSaturation
 
 componentLightness ∷ InputProps → PickerComponent
-componentLightness classes = mkNumComponent
+componentLightness classes = mkNumberComponent
   (\n → Just <<< modifyHSL _{l = n / 100.0})
   (\color → roundFractionalNum $ 100.0 * (Color.toHSLA color).l)
   classes
   confLightness
 
 componentSaturationHSV ∷ InputProps → PickerComponent
-componentSaturationHSV classes = mkNumComponent
+componentSaturationHSV classes = mkNumberComponent
   (\n → Just <<< modifyHSV _{s = n / 100.0})
   (\color → roundFractionalNum $ 100.0 * (Color.toHSVA color).s)
   classes
@@ -269,30 +296,30 @@ componentSaturationHSV classes = mkNumComponent
 
 
 componentValue ∷ InputProps → PickerComponent
-componentValue classes = mkNumComponent
+componentValue classes = mkNumberComponent
   (\n → Just <<< modifyHSV _{v = n / 100.0})
   (\color → roundFractionalNum $ 100.0 * (Color.toHSVA color).v)
   classes
   confValue
 
 componentRed ∷ InputProps → PickerComponent
-componentRed classes = mkNumComponent
-  (\n → Just <<< modifyRGB _{r = asInt n})
-  (\color → roundNum $ toNumber (Color.toRGBA color).r)
+componentRed classes = mkIntComponent
+  (\n → Just <<< modifyRGB _{r = n})
+  (\color → (Color.toRGBA color).r)
   classes
   confRed
 
 componentGreen ∷ InputProps → PickerComponent
-componentGreen classes = mkNumComponent
-  (\n → Just <<< modifyRGB _{g = asInt n})
-  (\color → roundNum $ toNumber (Color.toRGBA color).g)
+componentGreen classes = mkIntComponent
+  (\n → Just <<< modifyRGB _{g = n})
+  (\color → (Color.toRGBA color).g)
   classes
   confGreen
 
 componentBlue ∷ InputProps → PickerComponent
-componentBlue classes = mkNumComponent
-  (\n → Just <<< modifyRGB _{b = asInt n})
-  (\color → roundNum $ toNumber (Color.toRGBA color).b)
+componentBlue classes = mkIntComponent
+  (\n → Just <<< modifyRGB _{b = n})
+  (\color → (Color.toRGBA color).b)
   classes
   confBlue
 
@@ -345,45 +372,45 @@ renderInput {root, label, prefix, child} =
 -- Internal helpers
 
 
-confRed ∷ NumConf
+confRed ∷ NumConf Int
 confRed =
   { title: "Red"
   , placeholder: "R"
   , prefix: "R"
-  , range: MinMax 0.0 256.0
+  , range: MinMax 0 256
   }
 
-confGreen ∷ NumConf
+confGreen ∷ NumConf Int
 confGreen =
   { title: "Green"
   , placeholder: "G"
   , prefix: "G"
-  , range: MinMax 0.0 256.0
+  , range: MinMax 0 256
   }
 
-confBlue ∷ NumConf
+confBlue ∷ NumConf Int
 confBlue =
   { title: "Blue"
   , placeholder: "B"
   , prefix: "B"
-  , range: MinMax 0.0 256.0
+  , range: MinMax 0 256
   }
 
-confHue ∷ NumConf
+confHue ∷ NumConf Number
 confHue =
   { title: "Hue"
   , placeholder: "H"
   , prefix: "H"
   , range: MinMax 0.0 360.0
   }
-confSaturation ∷ NumConf
+confSaturation ∷ NumConf Number
 confSaturation =
   { title: "Saturation"
   , placeholder: "S"
   , prefix: "S"
   , range: MinMax 0.0 100.0
   }
-confLightness ∷ NumConf
+confLightness ∷ NumConf Number
 confLightness =
   { title: "Lightness"
   , placeholder: "L"
@@ -391,7 +418,7 @@ confLightness =
   , range: MinMax 0.0 100.0
   }
 
-confValue ∷ NumConf
+confValue ∷ NumConf Number
 confValue =
   { title: "Value"
   , placeholder: "V"
@@ -412,9 +439,6 @@ roundFractionalNum ∷ Number → Number
 roundFractionalNum n = roundNum (n * scalar) / scalar
   where
   scalar = 100.0
-
-asInt ∷ Number → Int
-asInt = floor
 
 roundNum ∷ Number → Number
 roundNum = round
