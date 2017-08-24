@@ -7,10 +7,10 @@
 .IsLight { color: black; }
 .IsDark { color: white; }
 
-.ColorPicker--small .ColorPicker-field  { width: 10em; height: 10em; }
+.ColorPicker--small .ColorPicker-field  { width: 10em; }
 .ColorPicker--small .ColorPicker-slider { width: 1em;  }
 
-.ColorPicker--large .ColorPicker-field  { width: 15em; height: 15em; }
+.ColorPicker--large .ColorPicker-field  { width: 15em; }
 .ColorPicker--large .ColorPicker-slider { width: 1.5em;}
 
 .ColorPicker-dragger {
@@ -22,13 +22,21 @@
   box-shadow: 0 0 0.1em 0.1em currentColor;
   transition: box-shadow 200ms ease-out;
   position: relative;
-  height: 100%;
   float: left;
   margin: 0.2em;
   background:
     linear-gradient(to top, hsl(0, 0%, 0%) 0%, hsla(0, 0%, 0%, 0) 100%),
     linear-gradient(to right, hsl(0, 0%, 100%) 0%, hsla(0, 0%, 100%, 0) 100%);
 }
+
+/* Make .ColorPicker-field square */
+.ColorPicker-field:after {
+  content: "";
+  display: block;
+  width: 100%;
+  margin-top: 100%;
+}
+
 
 .ColorPicker-fieldSelector {
   pointer-events: none;
