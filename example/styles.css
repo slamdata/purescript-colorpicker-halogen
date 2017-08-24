@@ -64,9 +64,9 @@
   pointer-events: none;
   position: absolute;
   background: #fff;
-  border-bottom: 0.05em solid #000;
-  right: -0.2em;
-  margin-top: -0.05em;
+  border-bottom: 1px solid #000;
+  right: -4px;
+  margin-top: -1px;
   width: 100%;
   height: 0.1em;
 }
@@ -85,17 +85,20 @@
 
 .ColorPicker-colorBlockCurrent,
 .ColorPicker-colorBlockOld {
+  font-size: inherit;
   height: 1.5em;
   box-sizing: border-box;
+  border-width: 0 ;
+  margin:0;
 }
 
 .ColorPicker-colorBlockCurrent:not(:only-child) {
   box-shadow: 0px 0 0 1px black;
   margin-right: 1px;
-  border-right-width: 0.05em;
+  border-right-width: 1px;
 }
 .ColorPicker-colorBlockCurrent {
-  border: 0.05em solid white;
+  border: 1px solid white;
   border-right-width: 0;
   flex: 2 1 0%;
 }
