@@ -10,7 +10,6 @@ module ColorPicker.Halogen.Component
 import Prelude
 
 import Color (Color)
-import Color as Color
 import ColorPicker.Halogen.Layout (ChildLayout(..), InputTextValue, Layout(..), PickerComponent(..), PositionUpdate, ValueHistory)
 import ColorPicker.Halogen.Utils.Drag as Drag
 import Control.Monad.Aff.Class (class MonadAff)
@@ -76,11 +75,8 @@ type DSL m = H.ParentDSL State Query ChildQuery Slot Message m
 type PickerEffects r = Drag.DragEffects r
 
 
-initialColor ∷ Color
-initialColor = Color.hsl 0.0 0.0 0.0
-
-picker ∷ ∀ m r. MonadAff (PickerEffects r) m ⇒ H.Component HH.HTML Query Props Message m
-picker = H.lifecycleParentComponent
+picker ∷ ∀ m r. MonadAff (PickerEffects r) m ⇒ Color → H.Component HH.HTML Query Props Message m
+picker initialColor = H.lifecycleParentComponent
   { initialState:
       { color: { current: initialColor, old: [] }
       , inputValues: mempty

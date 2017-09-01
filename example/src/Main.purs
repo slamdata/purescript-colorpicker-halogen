@@ -3,6 +3,7 @@ module Main where
 import Prelude
 
 import Color (Color, rgb)
+import Color.Scheme.X11 (blue, orange, red)
 import ColorPicker.Halogen.Component as CPicker
 import ColorPicker.Halogen.Layout as L
 import Control.Monad.Aff.Class (class MonadAff)
@@ -50,15 +51,16 @@ example = H.parentComponent
     }
 
 render ∷ ∀ m r. MonadAff (CPicker.PickerEffects r) m => State → HTML m
-render state = HH.div_
-  $ renderPicker 0 config0
-  <> renderPicker 1 config1
-  <> renderPicker 2 config2
+render state = HH.div [HP.class_ $ H.ClassName "root"]
+  $ renderPicker orange 0 config0
+  <> renderPicker blue 1 config1
+  <> renderPicker red 2 config2
+  <> renderPicker red 3 config3
 
   where
-  renderPicker idx conf =
+  renderPicker color idx conf =
     [ HH.h1_ [ HH.text $ "Picker " <> show idx ]
-    , HH.slot' cpColor idx CPicker.picker conf (HE.input $ HandleMsg idx)
+    , HH.slot' cpColor idx (CPicker.picker color) conf (HE.input $ HandleMsg idx)
     , HH.p_ [ HH.text case lookup idx state of
         Just ({current, next}) →
           "uncommited (current: " <> show current <>", next:" <> show next <> ")"
@@ -82,7 +84,7 @@ config0 ∷ CPicker.Props
 config0 = mkConf $ L.Root c $ reverse l
   where
   L.Root c l = mkLayout
-    (H.ClassName "ColorPicker--small")
+    [H.ClassName "ColorPicker--small", H.ClassName "ColorPicker--inline"]
     [ [ L.componentHue
       , L.componentSaturationHSL
       , L.componentLightness
@@ -91,7 +93,7 @@ config0 = mkConf $ L.Root c $ reverse l
 
 config1 ∷ CPicker.Props
 config1 = mkConf $ mkLayout
-  (H.ClassName "ColorPicker--large")
+  [H.ClassName "ColorPicker--large", H.ClassName "ColorPicker--inline"]
   [ [ L.componentHue
     , L.componentSaturationHSV
     , L.componentValue
@@ -107,7 +109,12 @@ config1 = mkConf $ mkLayout
 
 config2 ∷ CPicker.Props
 config2 = mkConf $ mkLayout
-  (H.ClassName "ColorPicker--small")
+  [H.ClassName "ColorPicker--small", H.ClassName "ColorPicker--inline"]
+  [ [ const componentRedORNoRed ]]
+
+config3 ∷ CPicker.Props
+config3 = mkConf $ mkLayout
+  [H.ClassName "ColorPicker--small", H.ClassName "ColorPicker--block"]
   [ [ const componentRedORNoRed ]]
 
 componentRedORNoRed ∷ L.PickerComponent
@@ -139,11 +146,11 @@ mkConf ∷ L.Layout → CPicker.Props
 mkConf = { layout: _ }
 
 mkLayout
-  ∷ H.ClassName
+  ∷ Array H.ClassName
   → Array (Array (L.InputProps → L.PickerComponent))
   → L.Layout
 mkLayout root editGroups =
-  [ H.ClassName "ColorPicker", root ] `L.Root`
+  ([ H.ClassName "ColorPicker"] <> root) `L.Root`
     [ [ H.ClassName "ColorPicker-dragger" ] `L.Group`
         [ L.Component $ L.componentDragSV
             { root: [ H.ClassName "ColorPicker-field" ]
