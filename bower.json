@@ -26,5 +26,8 @@
     "purescript-dom-classy": "^2.1.0",
     "purescript-dom": "^4.7.0",
     "purescript-number-input-halogen": "git://github.com/safareli/purescript-number-input-halogen.git#initial-props"
+  },
+  "resolutions": {
+    "purescript-colors": "^4.0.0"
   }
 }
