@@ -1,5 +1,5 @@
-module ColorPicker.Halogen.Layout
-  ( Layout(..)
+module ColorPicker.Halogen.Layout where
+{-  ( Layout(..)
   , ChildLayout(..)
   , PickerComponent(..)
   , NumComponentSpec
@@ -455,3 +455,4 @@ modifyHSV f c = let {h, s, v, a} = f $ Color.toHSVA c in Color.hsva h s v a
 
 modifyRGB ∷ (RecordRGBA → RecordRGBA) → Color → Color
 modifyRGB f c = let {r, g, b, a} = f $ Color.toRGBA c in Color.rgba r g b a
+-}

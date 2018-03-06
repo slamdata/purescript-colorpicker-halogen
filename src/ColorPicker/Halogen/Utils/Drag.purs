@@ -1,4 +1,5 @@
-module ColorPicker.Halogen.Utils.Drag
+module ColorPicker.Halogen.Utils.Drag where
+{-
   ( dragEventSource
   , DragData
   , CursorEvent
@@ -203,3 +204,4 @@ mkFirstDragData event = do
   let position = cursorEventToPosition event
   let node = cursorEventToTarget event
   mkDragData { prev: position , init: position } event node
+-}

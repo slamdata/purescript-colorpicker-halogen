@@ -1,4 +1,5 @@
-module ColorPicker.Halogen.Component
+module ColorPicker.Halogen.Component where
+{-
   ( picker
   , Query(GetValue, SetValue, Commit)
   , Message(..)
@@ -256,3 +257,4 @@ focus cursor layout =
   f idx = case _ of
     Just (Group _ l) → index l idx
     _ → Nothing
+-}
