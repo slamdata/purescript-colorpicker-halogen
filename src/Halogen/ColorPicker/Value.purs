@@ -60,7 +60,6 @@ render props state =
     <> [ HP.value state.input
        , HE.onValueInput $ HE.input Update
        , HP.type_ HP.InputNumber
-       , HP.step $ HP.Step 0.01
        , HP.min 0.0
        , HP.max 1.0
        ]

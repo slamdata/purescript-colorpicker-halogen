@@ -1,3 +1,8 @@
+.ColorPicker-copy {
+    width: 5rem;
+    height: 5rem;
+}
+
 .ColorPicker {
   padding: 0.3em;
   background: hsl(0, 0%, 80%);
@@ -29,6 +34,8 @@
   position: relative;
   float: left;
   margin: 0.2em;
+  min-height: 12em;
+  min-width: 12em;
   background:
     linear-gradient(to top, hsl(0, 0%, 0%) 0%, hsla(0, 0%, 0%, 0) 100%),
     linear-gradient(to right, hsl(0, 0%, 100%) 0%, hsla(0, 0%, 100%, 0) 100%);
@@ -62,6 +69,7 @@
   box-shadow: 0 0 0.1em 0.1em currentColor;
   transition: box-shadow 200ms ease-out;
   position: relative;
+  height: 10em;
   background: linear-gradient(#f00 0%, #f0f 17%, #00f 34%, #0ff 50%, #0f0 67%, #ff0 84%, #f00 100%);
 }
 
