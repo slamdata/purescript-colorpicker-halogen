@@ -2,21 +2,13 @@ module Halogen.ColorPicker.Hue where
 
 import Prelude
 
-import Data.Lens (view)
-import Halogen as H
 import Halogen.ColorPicker.Common as HCC
-import Halogen.Component.Proxy as HCP
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 
 component' ∷ ∀ m. HCC.InputProps → HCC.ColorModifier m
-component' props = HCP.proxy $ H.component
-  { initialState: view HCC._Hue
-  , render: render props
-  , eval: HCC.eval HCC._Hue
-  , receiver: HE.input HCC.Receive
-  }
+component' props = HCC.inputComponent HCC._Hue $ render props
 
 component ∷ ∀ m. HCC.ColorModifier m
 component = component' []
