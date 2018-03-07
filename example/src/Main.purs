@@ -7,15 +7,15 @@ import Control.Monad.Aff.Class (class MonadAff)
 import Control.Monad.Eff (Eff)
 import Data.Const (Const)
 import Data.Either as E
-import Data.Functor.Coproduct.Nested (type (<\/>))
 import Data.FoldableWithIndex as FI
-import Data.Maybe (Maybe(..))
+import Data.Functor.Coproduct.Nested (type (<\/>))
 import Data.List as L
-import Debug.Trace as DT
+import Data.Maybe (Maybe(..))
 import Halogen as H
 import Halogen.Aff as HA
 import Halogen.ColorPicker.Alpha as Alpha
 import Halogen.ColorPicker.Blue as Blue
+import Halogen.ColorPicker.Common as HCC
 import Halogen.ColorPicker.Copy as Copy
 import Halogen.ColorPicker.DragEventSource as HCD
 import Halogen.ColorPicker.Green as Green
@@ -28,9 +28,7 @@ import Halogen.ColorPicker.SVDrag as SVDrag
 import Halogen.ColorPicker.SaturationHSL as SaturationHSL
 import Halogen.ColorPicker.SaturationHSV as SaturationHSV
 import Halogen.ColorPicker.Value as Value
-import Halogen.ColorPicker.Common as HCC
 import Halogen.Component.ChildPath as CP
-import Halogen.Component.Proxy as HCP
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
