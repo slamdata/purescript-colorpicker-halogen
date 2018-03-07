@@ -8,9 +8,9 @@ import Control.Monad.Aff.Class (class MonadAff)
 import Control.Monad.Eff.Class (liftEff)
 import DOM.Classy.Event as DCE
 import DOM.HTML.Indexed as I
-import Data.Const (Const)
 import Data.Either (either, Either(..))
 import Halogen as H
+import Halogen.ColorPicker.Common as HCC
 import Halogen.ColorPicker.DragEventSource as HCD
 import Halogen.Component.Proxy as HCP
 import Halogen.HTML as HH
@@ -32,7 +32,7 @@ component'
   . MonadAff (HCD.DragEffects e) m
   ⇒ Array (HP.IProp I.HTMLdiv (Query Unit))
   → Array (HP.IProp I.HTMLdiv (Query Unit))
-  → HCP.ProxyComponent (Const Void) C.Color C.Color m
+  → HCC.ColorModifier m
 component' props sliderProps = HCP.proxy $ H.component
   { initialState: \color → { color }
   , render: render props sliderProps
@@ -40,10 +40,7 @@ component' props sliderProps = HCP.proxy $ H.component
   , receiver: HE.input Receive
   }
 
-component
-  ∷ ∀ m e
-  . MonadAff (HCD.DragEffects e) m
-  ⇒ HCP.ProxyComponent (Const Void) C.Color C.Color m
+component ∷ ∀ m e. MonadAff (HCD.DragEffects e) m ⇒ HCC.ColorModifier m
 component = component' [] []
 
 eval

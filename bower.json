@@ -1,12 +1,14 @@
 {
   "name": "purescript-colorpicker-halogen",
+  "homepage": "https://github.com/slamdata/purescript-colorpicker-halogen",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git://github.com/slamdata/purescript-colorpicker-halogen.git"
   },
   "authors": [
-    "Irakli Safareli <i.safareli@gmail.com>"
+    "Irakli Safareli <i.safareli@gmail.com>",
+    "Maksim Zimaliev <zimaliev@gmail.com>"
   ],
   "ignore": [
     "**/.*",

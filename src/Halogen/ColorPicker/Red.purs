@@ -2,68 +2,23 @@ module Halogen.ColorPicker.Red where
 
 import Prelude
 
-import Color as C
-import Control.MonadZero (guard)
-import Data.Const (Const)
-import Data.Foldable as F
-import Data.Int as Int
-import DOM.HTML.Indexed as I
-import Halogen as H
+import Halogen.ColorPicker.Common as HCC
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Halogen.Component.Proxy as HCP
 
-data Query a
-  = Receive C.Color a
-  | Update String a
+component' ∷ ∀ m. HCC.InputProps → HCC.ColorModifier m
+component' props = HCC.inputComponent HCC._Red $ render props
 
-type State =
-  { input ∷ String
-  , color ∷ C.Color
-  }
-
-component'
-  ∷ ∀ m
-  . Array (HP.IProp I.HTMLinput (Query Unit))
-  → HCP.ProxyComponent (Const Void) C.Color C.Color m
-component' props = HCP.proxy $ H.component
-  { initialState: \color → { color, input: show $ (C.toRGBA color).r }
-  , render: render props
-  , eval
-  , receiver: HE.input Receive
-  }
-
-component ∷ ∀ m. HCP.ProxyComponent (Const Void) C.Color C.Color m
+component ∷ ∀ m. HCC.ColorModifier m
 component = component' []
 
-eval ∷ ∀ m. Query ~> H.ComponentDSL State Query C.Color m
-eval = case _ of
-  Receive c next → do
-    st ← H.get
-    unless (st.color == c)
-      $ H.put { color: c, input: show $ (C.toRGBA c).r }
-    pure next
-  Update s next → do
-    st ← H.get
-    H.modify (_{ input = s })
-    let mbr = do
-          i ← Int.fromString s
-          guard $ i < 256 && i > -1
-          pure i
-    F.for_ mbr \r → do
-      let rgba = C.toRGBA st.color
-      let newColor = C.rgba r rgba.g rgba.b rgba.a
-      H.modify (_{ color = newColor })
-      H.raise newColor
-    pure next
-
-render ∷ Array (HP.IProp I.HTMLinput (Query Unit)) → State → H.ComponentHTML Query
+render ∷ HCC.InputProps → HCC.InputState → HCC.InputHTML
 render props state =
   HH.input
     $ props
     <> [ HP.value state.input
-       , HE.onValueInput $ HE.input Update
+       , HE.onValueInput $ HE.input HCC.Update
        , HP.type_ HP.InputNumber
        , HP.step $ HP.Step 1.0
        , HP.min 0.0
