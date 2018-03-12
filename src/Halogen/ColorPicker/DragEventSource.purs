@@ -1,4 +1,4 @@
-module ColorPicker.Halogen.Utils.Drag
+module Halogen.ColorPicker.DragEventSource
   ( dragEventSource
   , DragData
   , CursorEvent
@@ -31,11 +31,10 @@ import DOM.HTML.Types (HTMLElement, windowToEventTarget)
 import DOM.HTML.Window (scrollX, scrollY)
 import DOM.Node.Types (Node)
 import Data.Either (Either(..), either, hush)
-import Data.Foldable (traverse_)
-import Data.Int (toNumber)
+import Data.Foldable as F
+import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe)
 import Halogen.Query.EventSource as ES
-
 
 type DragData =
   { page ∷ Position
@@ -70,8 +69,6 @@ dragEventSource
   → (DragEvent → Maybe (f ES.SubscribeStatus))
   → ES.EventSource f m
 dragEventSource cursorEvent = ES.eventSource' \emit → do
-  let node = cursorEventToTarget cursorEvent
-  let initPos = cursorEventToPosition cursorEvent
   posRef ← newRef initPos
   let
     removeListeners ∷ Eff (DragEffects eff) Unit
@@ -96,17 +93,20 @@ dragEventSource cursorEvent = ES.eventSource' \emit → do
   addEventListener (cursorMoveFromEvent cursorEvent) cursorMove false win
   addEventListener (cursorUpFromEvent cursorEvent) cursorUp false win
   pure removeListeners
+  where
+  node = cursorEventToTarget cursorEvent
+  initPos = cursorEventToPosition cursorEvent
+
+
 
 cursorUpFromEvent ∷ CursorEvent → EventType
-cursorUpFromEvent (Left _) = mouseup
-cursorUpFromEvent (Right _) = touchend
+cursorUpFromEvent = either (const mouseup) (const touchend)
 
 cursorMoveFromEvent ∷ CursorEvent → EventType
-cursorMoveFromEvent (Left _) = mousemove
-cursorMoveFromEvent (Right _) = touchmove
+cursorMoveFromEvent = either (const mousemove) (const touchmove)
 
 onCursorEvent ∷ ∀ m. Applicative m => (CursorEvent → m Unit) → (Event → m Unit)
-onCursorEvent f event = traverse_ f $
+onCursorEvent f event = F.traverse_ f $
   map Left asMouseEvent <|> map Right asTouchEvent
   where
   asMouseEvent = hush $ runExcept $ MouseE.eventToMouseEvent event
@@ -116,23 +116,23 @@ cursorEventToTarget ∷ CursorEvent → Node
 cursorEventToTarget = either target target
 
 cursorEventToPosition ∷ CursorEvent → Position
-cursorEventToPosition (Left e) =
-  { x: toNumber $ MouseE.pageX e
-  , y: toNumber $ MouseE.pageY e
-  }
-cursorEventToPosition (Right e) =
-  case TouchE.item 0 $ TouchE.touches e of
+cursorEventToPosition = case _ of
+  Left e →
+    { x: Int.toNumber $ MouseE.pageX e
+    , y: Int.toNumber $ MouseE.pageY e
+    }
+  Right e → case TouchE.item 0 $ TouchE.touches e of
     Nothing → positionZero
     Just t →
-      { x: toNumber $ TouchE.pageX t
-      , y: toNumber $ TouchE.pageY t
+      { x: Int.toNumber $ TouchE.pageX t
+      , y: Int.toNumber $ TouchE.pageY t
       }
 
 scrollPosition ∷ ∀ r. Eff (dom ∷ DOM | r) Position
 scrollPosition = do
   w ← window
-  x ← toNumber <$> scrollX w
-  y ← toNumber <$> scrollY w
+  x ← Int.toNumber <$> scrollX w
+  y ← Int.toNumber <$> scrollY w
   pure {x, y}
 
 absoluteDomRect
@@ -146,14 +146,18 @@ absoluteDomRect rect scrollPos = rect
   , bottom = rect.bottom + scrollPos.y
   }
 
-nodeBoundingClientRect
-  ∷ ∀ r
-  . Node
-  → Eff (dom ∷ DOM | r) DOMRect
-nodeBoundingClientRect node = fromMaybe
-  (pure {left: 0.0, right: 0.0, top: 0.0, bottom: 0.0, width: 0.0, height: 0.0})
-  (getBoundingClientRect <$> elem)
+nodeBoundingClientRect ∷ ∀ r. Node → Eff (dom ∷ DOM | r) DOMRect
+nodeBoundingClientRect node =
+  fromMaybe (pure emptyRectangle) $ map getBoundingClientRect elem
   where
+  emptyRectangle =
+    { left: 0.0
+    , right: 0.0
+    , top: 0.0
+    , bottom: 0.0
+    , width: 0.0
+    , height: 0.0
+    }
   elem ∷ Maybe HTMLElement
   elem = fromNode node
 
@@ -182,7 +186,7 @@ mkDragData
   → Node
   → Eff ( dom ∷ DOM | r ) DragData
 mkDragData pos event node = do
-  rect ← absoluteDomRect <$> (nodeBoundingClientRect node) <*> scrollPosition
+  rect ← absoluteDomRect <$> nodeBoundingClientRect node <*> scrollPosition
   let
     pagePos = cursorEventToPosition event `clapInRect` rect
     pointer = pagePos `positionInRect` rect

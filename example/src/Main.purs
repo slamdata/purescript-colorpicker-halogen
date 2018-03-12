@@ -2,21 +2,32 @@ module Main where
 
 import Prelude
 
-import Color (Color, rgb)
-import Color.Scheme.X11 (blue, orange, red)
-import ColorPicker.Halogen.Component as CPicker
-import ColorPicker.Halogen.Layout as L
+import Color as C
 import Control.Monad.Aff.Class (class MonadAff)
 import Control.Monad.Eff (Eff)
-import Control.MonadZero (guard)
-import Data.Array (reverse)
-import Data.Either.Nested as Either
-import Data.Functor.Coproduct.Nested as Coproduct
-import Data.Map (Map, insert, lookup)
-import Data.Maybe (Maybe(..), maybe)
-import Data.Monoid (mempty)
+import Data.Const (Const)
+import Data.Either as E
+import Data.FoldableWithIndex as FI
+import Data.Functor.Coproduct.Nested (type (<\/>))
+import Data.List as L
+import Data.Maybe (Maybe(..))
 import Halogen as H
 import Halogen.Aff as HA
+import Halogen.ColorPicker.Alpha as Alpha
+import Halogen.ColorPicker.Blue as Blue
+import Halogen.ColorPicker.Common as HCC
+import Halogen.ColorPicker.Copy as Copy
+import Halogen.ColorPicker.DragEventSource as HCD
+import Halogen.ColorPicker.Green as Green
+import Halogen.ColorPicker.Hex as Hex
+import Halogen.ColorPicker.Hue as Hue
+import Halogen.ColorPicker.HueDrag as HueDrag
+import Halogen.ColorPicker.Luminosity as Luminosity
+import Halogen.ColorPicker.Red as Red
+import Halogen.ColorPicker.SVDrag as SVDrag
+import Halogen.ColorPicker.SaturationHSL as SaturationHSL
+import Halogen.ColorPicker.SaturationHSV as SaturationHSV
+import Halogen.ColorPicker.Value as Value
 import Halogen.Component.ChildPath as CP
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -26,161 +37,84 @@ import Halogen.VDom.Driver (runUI)
 main ∷ Eff (HA.HalogenEffects ()) Unit
 main = HA.runHalogenAff do
   body ← HA.awaitBody
-  runUI example unit body
+  _ ← runUI example unit body
+  pure unit
 
-data Query a = HandleMsg ColorIdx CPicker.Message a
+infixr 6 type E.Either as <+>
 
-type State = Map Int {current ∷ Color, next ∷ Color }
-type ColorIdx = Int
-type ChildQuery = Coproduct.Coproduct1 CPicker.Query
-type Slot = Either.Either1 ColorIdx
+data Query a
+  = HandleMsg C.Color a
+  | AddToPalette a
 
-cpColor ∷ CP.ChildPath CPicker.Query ChildQuery ColorIdx Slot
-cpColor = CP.cp1
+type ChildQuery =
+  HCC.ColorModifierQ <\/> HCC.ColorModifierQ <\/> Const Void
+
+type Slot = Int <+> Int <+> Void
+
+type State =
+  { color ∷ C.Color
+  , palette ∷ L.List C.Color
+  }
 
 type HTML m = H.ParentHTML Query ChildQuery Slot m
 type DSL m = H.ParentDSL State Query ChildQuery Slot Void m
 
-
-example ∷ ∀ m r. MonadAff (CPicker.PickerEffects r) m => H.Component HH.HTML Query Unit Void m
+example ∷ ∀ m r. MonadAff (HCD.DragEffects r) m ⇒ H.Component HH.HTML Query Unit Void m
 example = H.parentComponent
-    { initialState: const mempty
-    , render
-    , eval
-    , receiver: const Nothing
-    }
+  { initialState: const { color: C.black, palette: L.Nil }
+  , render
+  , eval
+  , receiver: const Nothing
+  }
 
-render ∷ ∀ m r. MonadAff (CPicker.PickerEffects r) m => State → HTML m
-render state = HH.div [HP.class_ $ H.ClassName "root"]
-  $ renderPicker orange 0 config0
-  <> renderPicker blue 1 config1
-  <> renderPicker red 2 config2
-  <> renderPicker red 3 config3
-
-  where
-  renderPicker color idx conf =
-    [ HH.h1_ [ HH.text $ "Picker " <> show idx ]
-    , HH.slot' cpColor idx (CPicker.picker color) conf (HE.input $ HandleMsg idx)
-    , HH.p_ [ HH.text case lookup idx state of
-        Just ({current, next}) →
-          "uncommited (current: " <> show current <>", next:" <> show next <> ")"
-        Nothing → "no color"
+render ∷ ∀ m r. MonadAff (HCD.DragEffects r) m ⇒ State → HTML m
+render {color: c, palette} =
+  HH.div [ HP.classes [ H.ClassName "ColorPicker", H.ClassName "ColorPicker--large", H.ClassName "ColorPicker--inline" ]]
+    $ [ HH.div [ HP.classes [ H.ClassName "ColorPicker-dragger" ]]
+          [ HH.slot' CP.cp1 15 (SVDrag.component' [ HP.class_ $ HH.ClassName "ColorPicker-field"] [HP.class_ $ HH.ClassName "ColorPicker-fieldSelector"]) c $ HE.input HandleMsg
+          , HH.slot' CP.cp1 14 (HueDrag.component' [ HP.class_ $ HH.ClassName "ColorPicker-slider" ] [ HP.class_ $ HH.ClassName "ColorPicker-sliderSelector"]) c $ HE.input HandleMsg
+          ]
+      , HH.div [ HP.classes [ H.ClassName "ColorPicker-aside" ]]
+          [ HH.div [ HP.classes [ H.ClassName "ColorPicker-stage" ]]
+            $ [ HH.slot' CP.cp1 1 (Copy.component' [ HP.class_ $ HH.ClassName "ColorPicker-colorBlockCurrent" ]) c $ HE.input HandleMsg
+              ]
+              <> FI.foldMapWithIndex foldFn palette
+          , HH.div [ HP.classes [ H.ClassName "ColorPicker-editing" ]]
+              [ HH.div [ HP.classes [ H.ClassName "ColorPicker-editingItem" ]]
+                  [ input "H" $ \p -> HH.slot' CP.cp1 6 (Hue.component' p) c $ HE.input HandleMsg
+                  , input "ʜSᴠ" $ \p -> HH.slot' CP.cp1 11 (SaturationHSV.component' $ p <> [HP.step $ HP.Step 0.01]) c $ HE.input HandleMsg
+                  , input "V" $ \p -> HH.slot' CP.cp1 12 (Value.component' $ p <> [HP.step $ HP.Step 0.01]) c $ HE.input HandleMsg
+                  , input "ʜSʟ" $ \p -> HH.slot' CP.cp1 7 (SaturationHSL.component' $ p <> [HP.step $ HP.Step 0.01]) c $ HE.input HandleMsg
+                  , input "L" $ \p -> HH.slot' CP.cp1 8 (Luminosity.component' $ p <> [HP.step $ HP.Step 0.01]) c $ HE.input HandleMsg
+                  ]
+              , HH.div [ HP.classes [ H.ClassName "ColorPicker-editingItem" ]]
+                  [ input "R" $ \p -> HH.slot' CP.cp1 2 (Red.component' p) c $ HE.input HandleMsg
+                  , input "G" $ \p -> HH.slot' CP.cp1 3 (Green.component' p) c $ HE.input HandleMsg
+                  , input "B" $ \p -> HH.slot' CP.cp1 4 (Blue.component' p) c $ HE.input HandleMsg
+                  , input "α" $ \p -> HH.slot' CP.cp1 5 (Alpha.component' $ p <> [HP.step $ HP.Step 0.01]) c $ HE.input HandleMsg
+                  , input "#" $ \p -> HH.slot' CP.cp1 0 (Hex.component' p) c $ HE.input HandleMsg
+                  ]
+              ]
+          , HH.div [ HP.classes [ H.ClassName "ColorPicker-actions" ]]
+              [ HH.button [ HP.classes [ H.ClassName "ColorPicker-actionSet" ], HE.onClick $ HE.input_ AddToPalette ] [ HH.text "Set" ]
+              ]
+          ]
       ]
-    ]
+  where
+  input label elem =
+    HH.div [ HP.classes [ H.ClassName "ColorPicker-input" ]]
+      [ HH.label [ HP.classes [ H.ClassName "ColorPicker-inputLabel" ]] [ HH.text label ]
+      , elem [ HP.classes [ H.ClassName "ColorPicker-inputElem" ]]
+      ]
+  foldFn ix col = [ HH.slot' CP.cp2 ix (Copy.component' [ HP.class_ $ HH.ClassName "ColorPicker-colorBlockOld" ]) col $ HE.input HandleMsg ]
 
 eval ∷ ∀ m. Query ~> DSL m
-eval (HandleMsg idx msg next) = do
-  H.modify update
-  pure next
-  where
-  update state = insert idx val state
-    where
-    val = case lookup idx state, msg of
-      Just s, CPicker.NextChange nextVal → s{next = nextVal}
-      _, CPicker.NextChange x → { next: x, current: x }
-      _, CPicker.NotifyChange x →  {next: x, current: x}
-
-config0 ∷ CPicker.Props
-config0 = mkConf $ L.Root c $ reverse l
-  where
-  L.Root c l = mkLayout
-    [H.ClassName "ColorPicker--small", H.ClassName "ColorPicker--inline"]
-    [ [ L.componentHue
-      , L.componentSaturationHSL
-      , L.componentLightness
-      ]
-    ]
-
-config1 ∷ CPicker.Props
-config1 = mkConf $ mkLayout
-  [H.ClassName "ColorPicker--large", H.ClassName "ColorPicker--inline"]
-  [ [ L.componentHue
-    , L.componentSaturationHSV
-    , L.componentValue
-    , L.componentSaturationHSL
-    , L.componentLightness
-    ]
-  , [ L.componentRed
-    , L.componentGreen
-    , L.componentBlue
-    , L.componentHEX
-    ]
-  ]
-
-config2 ∷ CPicker.Props
-config2 = mkConf $ mkLayout
-  [H.ClassName "ColorPicker--small", H.ClassName "ColorPicker--inline"]
-  [ [ const componentRedORNoRed ]]
-
-config3 ∷ CPicker.Props
-config3 = mkConf $ mkLayout
-  [H.ClassName "ColorPicker--small", H.ClassName "ColorPicker--block"]
-  [ [ const componentRedORNoRed ]]
-
-componentRedORNoRed ∷ L.PickerComponent
-componentRedORNoRed = L.TextComponentSpec
-  { fromString: \str → guard (str == "red") $> red
-  , view: \{color, value, onBlur, onValueInput } → pure $
-      HH.label
-        [ HP.classes inputClasses.root]
-        [ HH.span [HP.classes inputClasses.label] [HH.text "🛑"]
-        , HH.input
-          [ HP.type_ HP.InputText
-          , HP.classes
-            $  inputClasses.elem
-            <> (guard (L.isInvalid value) *> (inputClasses.elemInvalid))
-          , HP.title "red or nored?"
-          , HP.value $ maybe (toString color) _.value value
-          , HP.placeholder "red"
-          , HE.onValueInput $ onValueInput >>> Just
-          , HE.onBlur $ onBlur >>> Just
-          ]
-        ]
-  }
-  where
-  red = rgb 255 0 0
-  toString = \color → if color == red then "red" else "noRed"
-
-
-mkConf ∷ L.Layout → CPicker.Props
-mkConf = { layout: _ }
-
-mkLayout
-  ∷ Array H.ClassName
-  → Array (Array (L.InputProps → L.PickerComponent))
-  → L.Layout
-mkLayout root editGroups =
-  ([ H.ClassName "ColorPicker"] <> root) `L.Root`
-    [ [ H.ClassName "ColorPicker-dragger" ] `L.Group`
-        [ L.Component $ L.componentDragSV
-            { root: [ H.ClassName "ColorPicker-field" ]
-            , isLight: [ H.ClassName "IsLight" ]
-            , isDark: [ H.ClassName "IsDark" ]
-            , selector: [ H.ClassName "ColorPicker-fieldSelector"]
-            }
-        , L.Component $ L.componentDragHue
-            { root: [ H.ClassName "ColorPicker-slider" ]
-            , selector: [ H.ClassName "ColorPicker-sliderSelector"]
-            }
-        ]
-    , [ H.ClassName "ColorPicker-aside" ] `L.Group`
-        [ [ H.ClassName "ColorPicker-stage" ] `L.Group`
-            [ L.Component $ L.componentPreview [ H.ClassName "ColorPicker-colorBlockCurrent" ]
-            , L.Component $ L.componentHistory 4 [ H.ClassName "ColorPicker-colorBlockOld" ]
-            ]
-        , L.Group [ H.ClassName "ColorPicker-editing" ] $
-            editGroups <#> \editGroup →
-              L.Group [ H.ClassName "ColorPicker-editingItem" ] $
-                editGroup <#> \mkItem → L.Component $ mkItem inputClasses
-        , [ H.ClassName "ColorPicker-actions" ] `L.Group`
-            [ L.Component $ L.componentSet [ H.ClassName "ColorPicker-actionSet" ] ]
-        ]
-    ]
-
-inputClasses ∷ L.InputProps
-inputClasses =
-  { root: [H.ClassName "ColorPicker-input"]
-  , label: [H.ClassName "ColorPicker-inputLabel"]
-  , elem: [H.ClassName "ColorPicker-inputElem"]
-  , elemInvalid: [H.ClassName "ColorPicker-inputElem--invalid"]
-  }
+eval = case _ of
+  HandleMsg c next → do
+    H.modify (_{ color = c })
+    pure next
+  AddToPalette next → do
+    st ← H.get
+    unless (L.elem st.color st.palette) do
+      H.modify (_{ palette = L.Cons st.color st.palette })
+    pure next

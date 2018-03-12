@@ -3,8 +3,8 @@ dist: trusty
 sudo: required
 node_js: stable
 install:
-  - npm install -g bower
   - npm install
+  - npm install -g bower
   - bower install --production
 script:
   - npm run -s build
