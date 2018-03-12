@@ -1,7 +1,26 @@
-.ColorPicker-copy {
-    width: 5rem;
-    height: 5rem;
-    display: inline-block;
+.ColorPicker {
+  padding: 0.3em;
+  background: hsl(0, 0%, 80%);
+}
+.ColorPicker--block {
+  display: flex;
+}
+.ColorPicker--inline {
+  display: inline-flex;
+}
+
+.IsLight { color: black; }
+.IsDark { color: white; }
+
+.ColorPicker--small .ColorPicker-field  { width: 10em; }
+.ColorPicker--small .ColorPicker-slider { width: 1em;  }
+
+.ColorPicker--large .ColorPicker-field  { width: 15em; }
+.ColorPicker--large .ColorPicker-slider { width: 1.5em;}
+
+.ColorPicker-dragger {
+  user-select: none;
+  display: flex;
 }
 
 .ColorPicker-field {
@@ -10,8 +29,6 @@
   position: relative;
   float: left;
   margin: 0.2em;
-  min-height: 12em;
-  min-width: 12em;
   background:
     linear-gradient(to top, hsl(0, 0%, 0%) 0%, hsla(0, 0%, 0%, 0) 100%),
     linear-gradient(to right, hsl(0, 0%, 100%) 0%, hsla(0, 0%, 100%, 0) 100%);
@@ -45,7 +62,6 @@
   box-shadow: 0 0 0.1em 0.1em currentColor;
   transition: box-shadow 200ms ease-out;
   position: relative;
-  height: 10em;
   background: linear-gradient(#f00 0%, #f0f 17%, #00f 34%, #0ff 50%, #0f0 67%, #ff0 84%, #f00 100%);
 }
 
@@ -60,6 +76,97 @@
   height: 0.1em;
 }
 
-hr {
-    clear: left;
+.ColorPicker-aside {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+}
+
+.ColorPicker-stage {
+  display: flex;
+  margin: 0.2em;
+  box-shadow: 0 0 0 1px black inset, 0 0 0 2px white inset;
+  padding: 1px 2px 1px 1px;
+  background-color: #eee;
+  background-image: linear-gradient(45deg, black 25%, transparent 25%, transparent 75%, black 75%, black), 
+  linear-gradient(45deg, black 25%, transparent 25%, transparent 75%, black 75%, black);
+  background-size: 10px 10px;
+  background-position: 0 0, 5px 5px
+}
+
+.ColorPicker-colorBlockCurrent,
+.ColorPicker-colorBlockOld {
+  font-size: inherit;
+  height: 1.8em;
+  box-sizing: border-box;
+  border-width: 0 ;
+  margin:0;
+}
+
+.ColorPicker-colorBlockCurrent:not(:only-child) {
+  box-shadow: 0px 0 0 1px black;
+  margin-right: 1px;
+  border-right-width: 1px;
+}
+.ColorPicker-colorBlockCurrent {
+  border: 1px solid white;
+  border-right-width: 0;
+  flex: 2 1 0%;
+}
+
+.ColorPicker-colorBlockOld {
+  flex: 1 1 0%;
+  border-top: 1px solid white;
+  border-bottom: 1px solid white;
+  cursor: pointer;
+}
+
+.ColorPicker-ColorBlockOld:focus {
+  outline: -webkit-focus-ring-color auto 5px;
+}
+
+.ColorPicker-editing {
+  display: flex;
+  flex: 1;
+}
+
+.ColorPicker-editingItem {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+}
+
+.ColorPicker-input {
+  display: flex;
+  margin: 0.2em;
+}
+
+.ColorPicker-inputLabel {
+  width: 2em;
+  display: block;
+  text-align: center;
+  align-self: center;
+  flex: 1 1 auto;
+}
+
+.ColorPicker-inputElem,
+.ColorPicker-actionSet {
+  border: solid 1px;
+  padding: 0.3em;
+  width: 5em;
+  box-sizing: border-box;
+}
+
+.ColorPicker-inputElem--invalid {
+  color: red;
+}
+
+.ColorPicker-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0.2em;
+}
+
+.ColorPicker-actionSet:active {
+  box-shadow: 0 0 0.2em currentColor
 }

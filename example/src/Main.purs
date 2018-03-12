@@ -69,46 +69,44 @@ example = H.parentComponent
 
 render ∷ ∀ m r. MonadAff (HCD.DragEffects r) m ⇒ State → HTML m
 render {color: c, palette} =
-  HH.div_
-    $ [ HH.h3_ [ HH.text "HEX" ]
-      , HH.slot' CP.cp1 0 Hex.component c $ HE.input HandleMsg
-      , HH.hr_
-      , HH.h3_ [ HH.text "COPY" ]
-      , HH.slot' CP.cp1 1 copyComponent c  $ HE.input HandleMsg
-      , HH.hr_
-      , HH.h3_ [ HH.text "RGBA" ]
-      , HH.slot' CP.cp1 2 Red.component c $ HE.input HandleMsg
-      , HH.slot' CP.cp1 3 Green.component c $ HE.input HandleMsg
-      , HH.slot' CP.cp1 4 Blue.component c $ HE.input HandleMsg
-      , HH.slot' CP.cp1 5 Alpha.component c $ HE.input HandleMsg
-      , HH.hr_
-      , HH.h3_ [ HH.text "HSLA" ]
-      , HH.slot' CP.cp1 6 Hue.component c $ HE.input HandleMsg
-      , HH.slot' CP.cp1 7 SaturationHSL.component c $ HE.input HandleMsg
-      , HH.slot' CP.cp1 8 Luminosity.component c $ HE.input HandleMsg
-      , HH.slot' CP.cp1 9 Alpha.component c $ HE.input HandleMsg
-      , HH.hr_
-      , HH.h3_ [ HH.text "HSVA" ]
-      , HH.slot' CP.cp1 10 Hue.component c $ HE.input HandleMsg
-      , HH.slot' CP.cp1 11 SaturationHSV.component c $ HE.input HandleMsg
-      , HH.slot' CP.cp1 12 Value.component c $ HE.input HandleMsg
-      , HH.slot' CP.cp1 13 Alpha.component c $ HE.input HandleMsg
-      , HH.hr_
-      , HH.h3_ [ HH.text "Hue drag" ]
-      , HH.slot' CP.cp1 14 (HueDrag.component' [ HP.class_ $ HH.ClassName "ColorPicker-slider" ] [ HP.class_ $ HH.ClassName "ColorPicker-sliderSelector"]) c $ HE.input HandleMsg
-      , HH.hr_
-      , HH.h3_ [ HH.text "SV drag" ]
-      , HH.slot' CP.cp1 15 (SVDrag.component' [ HP.class_ $ HH.ClassName "ColorPicker-field"] [HP.class_ $ HH.ClassName "ColorPicker-fieldSelector"]) c $ HE.input HandleMsg
-      , HH.hr_
-      , HH.h3_ [ HH.text "Palette" ]
-      , HH.button [ HE.onClick $ HE.input_ AddToPalette ] [ HH.text "add to palette" ]
+  HH.div [ HP.classes [ H.ClassName "ColorPicker", H.ClassName "ColorPicker--large", H.ClassName "ColorPicker--inline" ]]
+    $ [ HH.div [ HP.classes [ H.ClassName "ColorPicker-dragger" ]]
+          [ HH.slot' CP.cp1 15 (SVDrag.component' [ HP.class_ $ HH.ClassName "ColorPicker-field"] [HP.class_ $ HH.ClassName "ColorPicker-fieldSelector"]) c $ HE.input HandleMsg
+          , HH.slot' CP.cp1 14 (HueDrag.component' [ HP.class_ $ HH.ClassName "ColorPicker-slider" ] [ HP.class_ $ HH.ClassName "ColorPicker-sliderSelector"]) c $ HE.input HandleMsg
+          ]
+      , HH.div [ HP.classes [ H.ClassName "ColorPicker-aside" ]]
+          [ HH.div [ HP.classes [ H.ClassName "ColorPicker-stage" ]]
+            $ [ HH.slot' CP.cp1 1 (Copy.component' [ HP.class_ $ HH.ClassName "ColorPicker-colorBlockCurrent" ]) c $ HE.input HandleMsg
+              ]
+              <> FI.foldMapWithIndex foldFn palette
+          , HH.div [ HP.classes [ H.ClassName "ColorPicker-editing" ]]
+              [ HH.div [ HP.classes [ H.ClassName "ColorPicker-editingItem" ]]
+                  [ input "H" $ \p -> HH.slot' CP.cp1 6 (Hue.component' p) c $ HE.input HandleMsg
+                  , input "ʜSᴠ" $ \p -> HH.slot' CP.cp1 11 (SaturationHSV.component' $ p <> [HP.step $ HP.Step 0.01]) c $ HE.input HandleMsg
+                  , input "V" $ \p -> HH.slot' CP.cp1 12 (Value.component' $ p <> [HP.step $ HP.Step 0.01]) c $ HE.input HandleMsg
+                  , input "ʜSʟ" $ \p -> HH.slot' CP.cp1 7 (SaturationHSL.component' $ p <> [HP.step $ HP.Step 0.01]) c $ HE.input HandleMsg
+                  , input "L" $ \p -> HH.slot' CP.cp1 8 (Luminosity.component' $ p <> [HP.step $ HP.Step 0.01]) c $ HE.input HandleMsg
+                  ]
+              , HH.div [ HP.classes [ H.ClassName "ColorPicker-editingItem" ]]
+                  [ input "R" $ \p -> HH.slot' CP.cp1 2 (Red.component' p) c $ HE.input HandleMsg
+                  , input "G" $ \p -> HH.slot' CP.cp1 3 (Green.component' p) c $ HE.input HandleMsg
+                  , input "B" $ \p -> HH.slot' CP.cp1 4 (Blue.component' p) c $ HE.input HandleMsg
+                  , input "α" $ \p -> HH.slot' CP.cp1 5 (Alpha.component' $ p <> [HP.step $ HP.Step 0.01]) c $ HE.input HandleMsg
+                  , input "#" $ \p -> HH.slot' CP.cp1 0 (Hex.component' p) c $ HE.input HandleMsg
+                  ]
+              ]
+          , HH.div [ HP.classes [ H.ClassName "ColorPicker-actions" ]]
+              [ HH.button [ HP.classes [ H.ClassName "ColorPicker-actionSet" ], HE.onClick $ HE.input_ AddToPalette ] [ HH.text "Set" ]
+              ]
+          ]
       ]
-    <> FI.foldMapWithIndex foldFn palette
   where
-  copyComponent = Copy.component' [ HP.class_ $ HH.ClassName "ColorPicker-copy" ]
-
-  foldFn ix col =
-    [ HH.slot' CP.cp2 ix copyComponent col $ HE.input HandleMsg ]
+  input label elem =
+    HH.div [ HP.classes [ H.ClassName "ColorPicker-input" ]]
+      [ HH.label [ HP.classes [ H.ClassName "ColorPicker-inputLabel" ]] [ HH.text label ]
+      , elem [ HP.classes [ H.ClassName "ColorPicker-inputElem" ]]
+      ]
+  foldFn ix col = [ HH.slot' CP.cp2 ix (Copy.component' [ HP.class_ $ HH.ClassName "ColorPicker-colorBlockOld" ]) col $ HE.input HandleMsg ]
 
 eval ∷ ∀ m. Query ~> DSL m
 eval = case _ of
