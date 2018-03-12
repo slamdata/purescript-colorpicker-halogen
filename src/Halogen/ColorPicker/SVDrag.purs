@@ -9,14 +9,15 @@ import Control.Monad.Eff.Class (liftEff)
 import DOM.Classy.Event as DCE
 import DOM.HTML.Indexed as I
 import Data.Either (either, Either(..))
+import Data.Record as Rec
 import Halogen as H
+import Halogen.ColorPicker.Common as HCC
 import Halogen.ColorPicker.DragEventSource as HCD
 import Halogen.Component.Proxy as HCP
 import Halogen.HTML as HH
 import Halogen.HTML.CSS as HCSS
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Halogen.ColorPicker.Common as HCC
 
 data Query a
   = Receive C.Color a
@@ -51,8 +52,7 @@ eval
 eval = case _ of
   Receive c next → do
     st ← H.get
-    unless (st.color == c)
-      $ H.put { color: c }
+    unless (C.toHSLA st.color `Rec.equal` C.toHSLA c) $ H.put { color: c }
     pure next
   DragStart event next → do
     H.subscribe $ HCD.dragEventSource event \drag →

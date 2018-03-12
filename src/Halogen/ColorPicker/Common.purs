@@ -4,16 +4,17 @@ import Prelude
 
 import Color as C
 import Control.MonadZero (guard)
+import DOM.HTML.Indexed as I
 import Data.Const (Const)
 import Data.Int as Int
 import Data.Lens (Iso', iso, view, review)
 import Data.Maybe as M
-import DOM.HTML.Indexed as I
+import Data.Record as Rec
 import Global as G
 import Halogen as H
+import Halogen.Component.Proxy as HCP
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Halogen.Component.Proxy as HCP
 
 type ColorModifier m = HCP.ProxyComponent (Const Void) C.Color C.Color m
 
@@ -39,7 +40,7 @@ eval ∷ ∀ m. InputBijection → InputQuery ~> InputDSL m
 eval bij = case _ of
   Receive c next → do
     st ← H.get
-    unless (st.color == c) $ H.put $ view bij c
+    unless (C.toHSLA st.color `Rec.equal` C.toHSLA c) $ H.put $ view bij c
     pure next
   Update s next → do
     H.modify (_{ input = s })
